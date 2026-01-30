@@ -6,7 +6,9 @@ A fast CLI tool for working with Apache Avro files written in Go.
 
 - 🚀 **Fast & Lightweight** - Efficient streaming processing with minimal memory footprint
 - 📝 **JSON Lines Output** - Compatible with `jq` and other standard UNIX tools
-- 🛡️ **Robust** - Comprehensive test coverage including fuzzing tests
+- 🔍 **Powerful Filtering** - Built-in CEL (Common Expression Language) query engine
+- 🎨 **Pretty Output** - Human-readable formatting with `--pretty` flag
+- 🛡️ **Robust** - Comprehensive test coverage including fuzzing tests for security
 - 🔧 **Extensible** - Clean architecture designed for easy feature additions
 
 ## Installation
@@ -33,14 +35,30 @@ go build -o gavro
 # Output Avro file contents as JSON Lines
 gavro cat users.avro
 
+# Output with pretty formatting
+gavro cat users.avro --pretty
+
 # Display schema
 gavro schema users.avro
 
 # Display schema (pretty-printed)
 gavro schema users.avro --pretty
 
-# Pipe to jq for filtering
+# Filter records using CEL expressions
+gavro query users.avro "record.age > 18"
+gavro q users.avro "record.age > 18"  # short alias
+
+# Pretty-printed query results
+gavro query users.avro "record.age > 18" --pretty
+
+# Complex filters
+gavro query users.avro "record.age >= 30 && record.name.startsWith('A')"
+gavro query users.avro "record.email.endsWith('@gmail.com')"
+gavro query users.avro "has(record.score) && record.score > 0.5"
+
+# Pipe to jq for further processing
 gavro cat users.avro | jq 'select(.age > 18)'
+gavro query users.avro "record.active == true" | jq '.name'
 
 # Extract specific fields
 gavro cat users.avro | jq '{name, email}'
@@ -55,9 +73,47 @@ gavro schema users.avro | jq '.fields[].name'
 ### Commands
 
 - `gavro cat <file.avro>` - Output Avro file contents as JSON Lines
+  - `--pretty, -p` - Pretty-print JSON with indentation
+- `gavro query <file.avro> <expression>` - Filter records using CEL expressions
+  - Alias: `q`
+  - `--pretty, -p` - Pretty-print JSON with indentation
 - `gavro schema <file.avro>` - Display Avro schema as JSON
+  - `--pretty, -p` - Pretty-print JSON with indentation
 - `gavro --help` - Show help
 - `gavro --version` - Show version
+
+### Query Language (CEL)
+
+The `query` command uses [Common Expression Language (CEL)](https://github.com/google/cel-spec) for filtering:
+
+**Syntax:**
+- Fields: `record.fieldName` (e.g., `record.age`)
+- Operators: `&&`, `||`, `!`, `==`, `!=`, `<`, `<=`, `>`, `>=`
+- String functions: `startsWith()`, `endsWith()`, `contains()`
+- Type functions: `has()`, `size()`, `int()`, `string()`
+- Math: `+`, `-`, `*`, `/`, `%`
+
+**Examples:**
+```bash
+# Simple comparison
+gavro query users.avro "record.age > 25"
+
+# Boolean logic
+gavro query users.avro "record.age > 18 && record.active == true"
+gavro query users.avro "record.age < 20 || record.age > 60"
+gavro query users.avro "!(record.deleted == true)"
+
+# String operations
+gavro query users.avro "record.name.startsWith('A')"
+gavro query users.avro "record.email.endsWith('.com')"
+gavro query users.avro "record.description.contains('urgent')"
+
+# Field existence
+gavro query users.avro "has(record.optional_field)"
+
+# Complex expressions
+gavro query logs.avro "record.level == 'ERROR' && record.timestamp > 1234567890"
+```
 
 ## JSON Lines Format
 
@@ -121,13 +177,17 @@ The project follows a clean, layered architecture:
 ```
 gavro/
 ├── cmd/              # CLI commands (cobra)
+│   ├── cat.go       # Output records
+│   ├── query.go     # Filter records
+│   └── schema.go    # Display schema
 ├── internal/
 │   ├── reader/       # Avro file reading
-│   ├── writer/       # JSON Lines output
-│   └── processor/    # Orchestration
+│   ├── writer/       # JSON Lines output (compact & pretty)
+│   ├── filter/       # CEL expression filtering
+│   └── processor/    # Orchestration layer
 ├── tests/
 │   ├── e2e/         # End-to-end tests
-│   ├── fuzz/        # Fuzzing tests
+│   ├── fuzz/        # Fuzzing tests (Avro & CEL)
 │   └── testdata/    # Test Avro files
 └── main.go          # Entry point
 ```
@@ -136,20 +196,28 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation.
 
 ## Roadmap
 
-Future features planned:
+Features:
+- [x] `gavro cat` - Output Avro as JSON Lines ✅
 - [x] `gavro schema` - Display Avro schema ✅
-- [ ] `gavro query` - Filter records with expressions
+- [x] `gavro query` - Filter records with CEL expressions ✅
+- [x] `--pretty` flag for human-readable output ✅
+
+Future features planned:
 - [ ] `gavro convert` - Convert between formats (Avro ↔ JSON ↔ CSV)
 - [ ] `gavro stats` - Show statistics about Avro file
 - [ ] Support for reading from stdin
-- [ ] Pretty table output for terminal
+- [ ] `--limit` flag for query results
+- [ ] `--count` flag to only count matches
 
 ## Testing
 
 gavro has comprehensive test coverage:
-- **E2E tests**: Test full CLI behavior including error handling, large files, and integration with jq
-- **Fuzzing tests**: 5 fuzzing strategies to ensure robustness against invalid/malicious inputs
+- **E2E tests**: Full CLI behavior testing for all commands (cat, query, schema) including error handling, large files, and integration with jq
+- **Fuzzing tests**: 9 fuzzing strategies covering:
+  - Avro file parsing (5 strategies)
+  - CEL query expressions (4 strategies including injection attacks)
 - **Test data**: Automatically generated test files (simple, complex, corrupted, large)
+- **Benchmarks**: Performance benchmarks for all commands
 
 See [tests/README.md](tests/README.md) for more details.
 
@@ -161,6 +229,7 @@ See [tests/README.md](tests/README.md) for more details.
 
 - [github.com/hamba/avro/v2](https://github.com/hamba/avro) - Fast Avro library
 - [github.com/spf13/cobra](https://github.com/spf13/cobra) - CLI framework
+- [github.com/google/cel-go](https://github.com/google/cel-go) - Common Expression Language for query filtering
 
 ## License
 
