@@ -1,0 +1,1 @@
+Obj–avro.schemaé{"name":"User","type":"record","fields":[{"name":"name","type":"string"},{"name":"age","type":"int"},{"name":"e
