@@ -379,3 +379,75 @@ func TestCatWithDifferentPaths(t *testing.T) {
 		})
 	}
 }
+
+// Тест --pretty флага
+func TestCatPrettyFlag(t *testing.T) {
+	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "--pretty")
+
+	if exitCode != 0 {
+		t.Fatal("cat --pretty failed")
+	}
+
+	// Проверяем что есть отступы (признак pretty-print)
+	if !strings.Contains(stdout, "  \"age\"") {
+		t.Error("Output should contain indented fields")
+	}
+
+	// Проверяем что между записями есть пустые строки
+	if !strings.Contains(stdout, "}\n\n{") {
+		t.Error("Records should be separated by blank lines in pretty mode")
+	}
+
+	// Проверяем что весь вывод - валидный JSON если объединить записи в массив
+	// Разделяем по пустым строкам
+	records := strings.Split(strings.TrimSpace(stdout), "\n\n")
+	if len(records) != 3 {
+		t.Errorf("Expected 3 records separated by blank lines, got %d", len(records))
+	}
+
+	// Каждая запись должна быть валидным JSON
+	for i, record := range records {
+		var obj map[string]interface{}
+		if err := json.Unmarshal([]byte(record), &obj); err != nil {
+			t.Errorf("Record %d is not valid JSON: %v\nRecord:\n%s", i, err, record)
+		}
+	}
+}
+
+// Тест короткого флага -p
+func TestCatPrettyShortFlag(t *testing.T) {
+	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "-p")
+
+	if exitCode != 0 {
+		t.Fatal("cat -p failed")
+	}
+
+	// Проверяем что есть отступы
+	if !strings.Contains(stdout, "  \"age\"") {
+		t.Error("Output should contain indented fields with -p flag")
+	}
+}
+
+// Тест что без флага выводится компактный JSON
+func TestCatCompactByDefault(t *testing.T) {
+	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro")
+
+	if exitCode != 0 {
+		t.Fatal("cat failed")
+	}
+
+	// Проверяем что НЕТ отступов (компактный JSON)
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+
+	// Каждая строка должна начинаться с {, а не с пробелов
+	for i, line := range lines {
+		if !strings.HasPrefix(line, "{") {
+			t.Errorf("Line %d should start with '{' in compact mode, got: %s", i, line[:min(20, len(line))])
+		}
+
+		// Не должно быть двойных переносов строк между записями
+		if strings.Contains(line, "\n\n") {
+			t.Error("Should not have blank lines between records in compact mode")
+		}
+	}
+}

@@ -23,6 +23,9 @@ Examples:
   # Output all records
   gavro cat users.avro
 
+  # Pretty-printed output
+  gavro cat users.avro --pretty
+
   # Filter with jq
   gavro cat users.avro | jq 'select(.age > 18)'
 
@@ -34,13 +37,14 @@ Examples:
 
 func init() {
 	rootCmd.AddCommand(catCmd)
+	catCmd.Flags().BoolP("pretty", "p", false, "pretty-print JSON with indentation")
 	// Будущие флаги:
-	// catCmd.Flags().BoolP("pretty", "p", false, "pretty-print JSON")
 	// catCmd.Flags().IntP("limit", "n", 0, "limit number of records")
 }
 
 func runCat(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
+	pretty, _ := cmd.Flags().GetBool("pretty")
 
 	// Создаем Avro reader
 	avroReader, err := reader.NewAvroReader(filePath)
@@ -50,7 +54,7 @@ func runCat(cmd *cobra.Command, args []string) error {
 	defer avroReader.Close()
 
 	// Создаем JSON Lines writer
-	jsonWriter := writer.NewJSONLinesWriter(os.Stdout)
+	jsonWriter := writer.NewJSONLinesWriter(os.Stdout, pretty)
 
 	// Обрабатываем файл
 	proc := processor.NewProcessor(avroReader, jsonWriter)
