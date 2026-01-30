@@ -33,6 +33,12 @@ go build -o gavro
 # Output Avro file contents as JSON Lines
 gavro cat users.avro
 
+# Display schema
+gavro schema users.avro
+
+# Display schema (pretty-printed)
+gavro schema users.avro --pretty
+
 # Pipe to jq for filtering
 gavro cat users.avro | jq 'select(.age > 18)'
 
@@ -42,15 +48,16 @@ gavro cat users.avro | jq '{name, email}'
 # Count records
 gavro cat users.avro | jq -s 'length'
 
-# Pretty print
-gavro cat users.avro | jq '.'
+# Analyze schema with jq
+gavro schema users.avro | jq '.fields[].name'
 ```
 
 ### Commands
 
 - `gavro cat <file.avro>` - Output Avro file contents as JSON Lines
+- `gavro schema <file.avro>` - Display Avro schema as JSON
 - `gavro --help` - Show help
-- `gavro cat --help` - Show help for cat command
+- `gavro --version` - Show version
 
 ## JSON Lines Format
 
@@ -130,7 +137,7 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation.
 ## Roadmap
 
 Future features planned:
-- [ ] `gavro schema` - Display Avro schema
+- [x] `gavro schema` - Display Avro schema ✅
 - [ ] `gavro query` - Filter records with expressions
 - [ ] `gavro convert` - Convert between formats (Avro ↔ JSON ↔ CSV)
 - [ ] `gavro stats` - Show statistics about Avro file

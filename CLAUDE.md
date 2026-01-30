@@ -49,11 +49,18 @@ go run tests/testdata/generate.go
 # Output all records from an Avro file
 gavro cat users.avro
 
+# Display Avro schema
+gavro schema users.avro
+gavro schema users.avro --pretty
+
 # Filter records with jq
 gavro cat users.avro | jq 'select(.age > 18)'
 
 # Extract specific fields
 gavro cat users.avro | jq '{name, email}'
+
+# Analyze schema
+gavro schema users.avro | jq '.fields[].name'
 
 # Count records
 gavro cat users.avro | jq -s 'length'
