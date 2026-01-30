@@ -1,4 +1,4 @@
-module gavro
+module github.com/en666ki/gavro
 
 go 1.25.6
 

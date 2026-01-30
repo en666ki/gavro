@@ -1,6 +1,6 @@
 package main
 
-import "gavro/cmd"
+import "github.com/en666ki/gavro/cmd"
 
 func main() {
 	cmd.Execute()

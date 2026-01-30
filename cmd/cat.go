@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gavro/internal/processor"
-	"gavro/internal/reader"
-	"gavro/internal/writer"
+	"github.com/en666ki/gavro/internal/processor"
+	"github.com/en666ki/gavro/internal/reader"
+	"github.com/en666ki/gavro/internal/writer"
 )
 
 var catCmd = &cobra.Command{

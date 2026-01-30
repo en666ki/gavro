@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"gavro/internal/reader"
-	"gavro/internal/writer"
+	"github.com/en666ki/gavro/internal/reader"
+	"github.com/en666ki/gavro/internal/writer"
 )
 
 // Processor координирует чтение и запись данных
