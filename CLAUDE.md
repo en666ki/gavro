@@ -53,11 +53,16 @@ gavro cat users.avro
 gavro schema users.avro
 gavro schema users.avro --pretty
 
+# Extract specific fields
+gavro select users.avro record.name
+gavro select users.avro record.name record.email record.age
+gavro select users.avro record.nested.field1 --pretty
+
+# Filter records with query
+gavro query users.avro "record.age > 18"
+
 # Filter records with jq
 gavro cat users.avro | jq 'select(.age > 18)'
-
-# Extract specific fields
-gavro cat users.avro | jq '{name, email}'
 
 # Analyze schema
 gavro schema users.avro | jq '.fields[].name'
@@ -76,7 +81,10 @@ The project follows a clean, layered architecture designed for extensibility:
 gavro/
 ├── cmd/                  # CLI commands (cobra)
 │   ├── root.go          # Root command setup
-│   └── cat.go           # Cat command implementation
+│   ├── cat.go           # Cat command - output all records
+│   ├── schema.go        # Schema command - display Avro schema
+│   ├── query.go         # Query command - filter with CEL expressions
+│   └── select.go        # Select command - extract specific fields
 ├── internal/
 │   ├── reader/          # Data reading layer
 │   │   ├── reader.go    # Reader interface
@@ -84,6 +92,8 @@ gavro/
 │   ├── writer/          # Data output layer
 │   │   ├── writer.go    # Writer interface
 │   │   └── jsonlines.go # JSON Lines writer implementation
+│   ├── filter/          # Filtering layer
+│   │   └── cel.go       # CEL expression filtering
 │   └── processor/       # Processing orchestration
 │       └── processor.go # Coordinates reading and writing
 ├── main.go              # Entry point
@@ -113,16 +123,20 @@ gavro/
    - Uses cobra framework for command structure
    - `root.go`: Base command and help
    - `cat.go`: Reads Avro file and outputs as JSON Lines
+   - `schema.go`: Displays Avro schema from file
+   - `query.go`: Filters records using CEL expressions
+   - `select.go`: Extracts specific fields using dot notation
    - Error handling with context wrapping
 
 ### Extension Points
 
 The architecture makes it easy to add:
 
-- **New commands**: Add to `cmd/` (e.g., `schema.go`, `query.go`)
+- **New commands**: Add to `cmd/` (e.g., `list.go` for metadata, `convert.go` for format conversion)
 - **New input formats**: Implement `Reader` interface (e.g., `ParquetReader`, `JSONReader`)
 - **New output formats**: Implement `Writer` interface (e.g., `TableWriter`, `CSVWriter`)
 - **Transformations**: Add `internal/transform/` layer between Reader and Writer
+- **Field selection**: Current `select` command can be extended with wildcards, regex patterns
 
 ### Dependencies
 
