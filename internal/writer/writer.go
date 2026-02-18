@@ -1,10 +1,10 @@
 package writer
 
-// Writer - интерфейс для записи записей в различные форматы
+// Writer writes records to an output destination.
 type Writer interface {
-	// Write записывает одну запись
-	Write(record map[string]interface{}) error
+	// Write writes a single record.
+	Write(record interface{}) error
 
-	// Flush сбрасывает буферы (если есть)
+	// Flush flushes any buffered output.
 	Flush() error
 }

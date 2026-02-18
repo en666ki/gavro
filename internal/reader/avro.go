@@ -9,21 +9,20 @@ import (
 	"github.com/hamba/avro/v2/ocf"
 )
 
-// AvroReader читает записи из Avro OCF файла
+// AvroReader reads records from an Avro OCF file.
 type AvroReader struct {
 	file   *os.File
 	reader *ocf.Decoder
 	schema avro.Schema
 }
 
-// NewAvroReader создает новый reader для Avro файла
+// NewAvroReader opens an Avro OCF file and returns a reader for it.
 func NewAvroReader(filePath string) (*AvroReader, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open file: %w", err)
 	}
 
-	// Создаем OCF decoder который читает схему автоматически
 	reader, err := ocf.NewDecoder(file)
 	if err != nil {
 		file.Close()
@@ -37,9 +36,12 @@ func NewAvroReader(filePath string) (*AvroReader, error) {
 	}, nil
 }
 
-// Read читает следующую запись из Avro файла
+// Read returns the next record from the Avro file.
 func (r *AvroReader) Read() (Record, error) {
 	if !r.reader.HasNext() {
+		if err := r.reader.Error(); err != nil {
+			return nil, fmt.Errorf("read error: %w", err)
+		}
 		return nil, io.EOF
 	}
 
@@ -51,7 +53,7 @@ func (r *AvroReader) Read() (Record, error) {
 	return Record(record), nil
 }
 
-// Close закрывает файл
+// Close closes the underlying file.
 func (r *AvroReader) Close() error {
 	if r.file != nil {
 		return r.file.Close()
@@ -59,7 +61,7 @@ func (r *AvroReader) Close() error {
 	return nil
 }
 
-// Schema возвращает схему Avro (может быть полезно для будущих команд)
+// Schema returns the Avro schema read from the file header.
 func (r *AvroReader) Schema() avro.Schema {
 	return r.schema
 }

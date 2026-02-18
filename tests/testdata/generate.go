@@ -8,7 +8,6 @@ import (
 	"github.com/hamba/avro/v2/ocf"
 )
 
-// Генерирует различные тестовые Avro файлы
 func main() {
 	generateSimpleUsers()
 	generateComplexSchema()
@@ -18,7 +17,6 @@ func main() {
 	log.Println("All test files generated")
 }
 
-// Простая схема с пользователями
 func generateSimpleUsers() {
 	schema := `{
 		"type": "record",
@@ -30,11 +28,20 @@ func generateSimpleUsers() {
 		]
 	}`
 
-	s, _ := avro.Parse(schema)
-	f, _ := os.Create("tests/testdata/users.avro")
+	s, err := avro.Parse(schema)
+	if err != nil {
+		log.Fatal(err)
+	}
+	f, err := os.Create("tests/testdata/users.avro")
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer f.Close()
 
-	enc, _ := ocf.NewEncoderWithSchema(s, f, ocf.WithCodec(ocf.Deflate))
+	enc, err := ocf.NewEncoderWithSchema(s, f, ocf.WithCodec(ocf.Deflate))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	users := []map[string]interface{}{
 		{"name": "Alice", "age": int32(30), "email": "alice@example.com"},
@@ -43,12 +50,15 @@ func generateSimpleUsers() {
 	}
 
 	for _, u := range users {
-		enc.Encode(u)
+		if err := enc.Encode(u); err != nil {
+			log.Fatal(err)
+		}
 	}
-	enc.Flush()
+	if err := enc.Flush(); err != nil {
+		log.Fatal(err)
+	}
 }
 
-// Сложная вложенная схема
 func generateComplexSchema() {
 	schema := `{
 		"type": "record",
@@ -70,11 +80,20 @@ func generateComplexSchema() {
 		]
 	}`
 
-	s, _ := avro.Parse(schema)
-	f, _ := os.Create("tests/testdata/complex.avro")
+	s, err := avro.Parse(schema)
+	if err != nil {
+		log.Fatal(err)
+	}
+	f, err := os.Create("tests/testdata/complex.avro")
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer f.Close()
 
-	enc, _ := ocf.NewEncoderWithSchema(s, f, ocf.WithCodec(ocf.Null))
+	enc, err := ocf.NewEncoderWithSchema(s, f, ocf.WithCodec(ocf.Null))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	records := []map[string]interface{}{
 		{
@@ -105,12 +124,15 @@ func generateComplexSchema() {
 	}
 
 	for _, r := range records {
-		enc.Encode(r)
+		if err := enc.Encode(r); err != nil {
+			log.Fatal(err)
+		}
 	}
-	enc.Flush()
+	if err := enc.Flush(); err != nil {
+		log.Fatal(err)
+	}
 }
 
-// Пустой файл (только заголовок)
 func generateEmptyFile() {
 	schema := `{
 		"type": "record",
@@ -118,15 +140,25 @@ func generateEmptyFile() {
 		"fields": [{"name": "field", "type": "string"}]
 	}`
 
-	s, _ := avro.Parse(schema)
-	f, _ := os.Create("tests/testdata/empty.avro")
+	s, err := avro.Parse(schema)
+	if err != nil {
+		log.Fatal(err)
+	}
+	f, err := os.Create("tests/testdata/empty.avro")
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer f.Close()
 
-	enc, _ := ocf.NewEncoderWithSchema(s, f, ocf.WithCodec(ocf.Null))
-	enc.Flush()
+	enc, err := ocf.NewEncoderWithSchema(s, f, ocf.WithCodec(ocf.Null))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := enc.Flush(); err != nil {
+		log.Fatal(err)
+	}
 }
 
-// Большой файл для тестирования производительности
 func generateLargeFile() {
 	schema := `{
 		"type": "record",
@@ -139,13 +171,21 @@ func generateLargeFile() {
 		]
 	}`
 
-	s, _ := avro.Parse(schema)
-	f, _ := os.Create("tests/testdata/large.avro")
+	s, err := avro.Parse(schema)
+	if err != nil {
+		log.Fatal(err)
+	}
+	f, err := os.Create("tests/testdata/large.avro")
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer f.Close()
 
-	enc, _ := ocf.NewEncoderWithSchema(s, f, ocf.WithCodec(ocf.Snappy))
+	enc, err := ocf.NewEncoderWithSchema(s, f, ocf.WithCodec(ocf.Snappy))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// 10000 записей
 	for i := 0; i < 10000; i++ {
 		record := map[string]interface{}{
 			"timestamp": int64(1234567890 + i),
@@ -157,27 +197,37 @@ func generateLargeFile() {
 				"key3": "value3",
 			},
 		}
-		enc.Encode(record)
+		if err := enc.Encode(record); err != nil {
+			log.Fatal(err)
+		}
 	}
-	enc.Flush()
+	if err := enc.Flush(); err != nil {
+		log.Fatal(err)
+	}
 }
 
-// Поврежденные файлы для fuzzy тестирования
 func generateCorruptedFiles() {
-	// Файл с неправильным magic header
-	os.WriteFile("tests/testdata/bad_magic.avro", []byte("NOT_AVRO_FILE_HEADER"), 0644)
+	if err := os.WriteFile("tests/testdata/bad_magic.avro", []byte("NOT_AVRO_FILE_HEADER"), 0644); err != nil {
+		log.Fatal(err)
+	}
 
-	// Пустой файл
-	os.WriteFile("tests/testdata/totally_empty.avro", []byte{}, 0644)
+	if err := os.WriteFile("tests/testdata/totally_empty.avro", []byte{}, 0644); err != nil {
+		log.Fatal(err)
+	}
 
-	// Файл с обрезанными данными
-	data, _ := os.ReadFile("tests/testdata/users.avro")
-	os.WriteFile("tests/testdata/truncated.avro", data[:len(data)/2], 0644)
+	data, err := os.ReadFile("tests/testdata/users.avro")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := os.WriteFile("tests/testdata/truncated.avro", data[:len(data)/2], 0644); err != nil {
+		log.Fatal(err)
+	}
 
-	// Случайный мусор
 	garbage := make([]byte, 1024)
 	for i := range garbage {
 		garbage[i] = byte(i % 256)
 	}
-	os.WriteFile("tests/testdata/garbage.avro", garbage, 0644)
+	if err := os.WriteFile("tests/testdata/garbage.avro", garbage, 0644); err != nil {
+		log.Fatal(err)
+	}
 }

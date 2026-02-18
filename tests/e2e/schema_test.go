@@ -15,13 +15,11 @@ func TestSchemaSimpleFile(t *testing.T) {
 		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
 	}
 
-	// Проверяем что это валидный JSON
 	var schema map[string]interface{}
 	if err := json.Unmarshal([]byte(stdout), &schema); err != nil {
 		t.Fatalf("Output is not valid JSON: %v", err)
 	}
 
-	// Проверяем основные поля схемы
 	if schema["name"] != "User" {
 		t.Errorf("Expected schema name 'User', got %v", schema["name"])
 	}
@@ -30,7 +28,6 @@ func TestSchemaSimpleFile(t *testing.T) {
 		t.Errorf("Expected schema type 'record', got %v", schema["type"])
 	}
 
-	// Проверяем поля
 	fields, ok := schema["fields"].([]interface{})
 	if !ok || len(fields) != 3 {
 		t.Errorf("Expected 3 fields, got %v", fields)
@@ -49,12 +46,14 @@ func TestSchemaComplexFile(t *testing.T) {
 		t.Fatalf("Output is not valid JSON: %v", err)
 	}
 
-	// Проверяем сложную схему
 	if schema["name"] != "ComplexRecord" {
 		t.Errorf("Expected schema name 'ComplexRecord', got %v", schema["name"])
 	}
 
-	fields := schema["fields"].([]interface{})
+	fields, ok := schema["fields"].([]interface{})
+	if !ok {
+		t.Fatalf("Expected 'fields' to be []interface{}, got %T", schema["fields"])
+	}
 	if len(fields) != 6 {
 		t.Errorf("Expected 6 fields in complex schema, got %d", len(fields))
 	}
@@ -67,7 +66,6 @@ func TestSchemaPrettyFlag(t *testing.T) {
 		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
 	}
 
-	// Pretty формат должен содержать переносы строк и отступы
 	if !strings.Contains(stdout, "\n") {
 		t.Error("Pretty output should contain newlines")
 	}
@@ -76,7 +74,6 @@ func TestSchemaPrettyFlag(t *testing.T) {
 		t.Error("Pretty output should contain indentation")
 	}
 
-	// Должен быть валидный JSON
 	var schema map[string]interface{}
 	if err := json.Unmarshal([]byte(stdout), &schema); err != nil {
 		t.Fatalf("Pretty output is not valid JSON: %v", err)
@@ -90,7 +87,6 @@ func TestSchemaCompactOutput(t *testing.T) {
 		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
 	}
 
-	// Compact формат должен быть одной строкой (плюс \n в конце)
 	lines := strings.Split(strings.TrimSpace(stdout), "\n")
 	if len(lines) != 1 {
 		t.Errorf("Compact output should be single line, got %d lines", len(lines))
@@ -163,22 +159,30 @@ func TestSchemaHelp(t *testing.T) {
 }
 
 func TestSchemaWithJq(t *testing.T) {
-	// Проверяем что jq есть
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skip("jq not found, skipping integration test")
 	}
 
-	// gavro schema | jq '.fields[].name'
 	gavroCmd := exec.Command("/tmp/"+binaryName, "schema", "../../tests/testdata/users.avro")
 	jqCmd := exec.Command("jq", "-r", ".fields[].name")
 
 	var output bytes.Buffer
-	jqCmd.Stdin, _ = gavroCmd.StdoutPipe()
+	pipe, err := gavroCmd.StdoutPipe()
+	if err != nil {
+		t.Fatalf("Failed to create stdout pipe: %v", err)
+	}
+	jqCmd.Stdin = pipe
 	jqCmd.Stdout = &output
 
-	jqCmd.Start()
-	gavroCmd.Run()
-	jqCmd.Wait()
+	if err := jqCmd.Start(); err != nil {
+		t.Fatalf("Failed to start jq: %v", err)
+	}
+	if err := gavroCmd.Run(); err != nil {
+		t.Fatalf("gavro command failed: %v", err)
+	}
+	if err := jqCmd.Wait(); err != nil {
+		t.Fatalf("jq command failed: %v", err)
+	}
 
 	result := output.String()
 	expectedFields := []string{"name", "age", "email"}
@@ -219,7 +223,10 @@ func TestSchemaDifferentFiles(t *testing.T) {
 				t.Errorf("Expected schema name '%s', got %v", tc.expectedName, schema["name"])
 			}
 
-			fields := schema["fields"].([]interface{})
+			fields, ok := schema["fields"].([]interface{})
+			if !ok {
+				t.Fatalf("Expected 'fields' to be []interface{}, got %T", schema["fields"])
+			}
 			if len(fields) != tc.expectedFields {
 				t.Errorf("Expected %d fields, got %d", tc.expectedFields, len(fields))
 			}

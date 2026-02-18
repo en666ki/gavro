@@ -12,18 +12,14 @@ func TestVersionFlag(t *testing.T) {
 		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
 	}
 
-	// Должно содержать "gavro version"
 	if !strings.Contains(stdout, "gavro version") {
 		t.Errorf("Expected 'gavro version' in output, got: %s", stdout)
 	}
 
-	// Не должно быть просто "dev" в production билдах
-	// В dev окружении может быть "dev", хэш коммита или версия с +dirty
 	if strings.TrimSpace(stdout) == "gavro version dev" {
 		t.Log("Warning: version is 'dev' - this is ok for development builds")
 	}
 
-	// Версия не должна быть пустой
 	parts := strings.Fields(stdout)
 	if len(parts) < 3 {
 		t.Errorf("Version output should have at least 3 parts, got: %s", stdout)
@@ -49,22 +45,18 @@ func TestVersionFormat(t *testing.T) {
 		t.Fatal("Version command should return exit code 0")
 	}
 
-	// Проверяем разные форматы версии
 	output := strings.TrimSpace(stdout)
 
-	// Формат: "gavro version X.Y.Z" или "gavro version vX.Y.Z" или "gavro version <hash>" или "gavro version dev"
 	if !strings.HasPrefix(output, "gavro version ") {
 		t.Errorf("Version should start with 'gavro version ', got: %s", output)
 	}
 
 	versionPart := strings.TrimPrefix(output, "gavro version ")
 
-	// Версия не должна быть пустой
 	if versionPart == "" {
 		t.Error("Version part should not be empty")
 	}
 
-	// Проверяем возможные форматы
 	isValidFormat := false
 
 	// Semantic version: v0.1.0, v1.2.3, etc

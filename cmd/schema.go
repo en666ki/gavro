@@ -10,10 +10,6 @@ import (
 	"github.com/en666ki/gavro/internal/reader"
 )
 
-var (
-	schemaPretty bool
-)
-
 var schemaCmd = &cobra.Command{
 	Use:   "schema <file.avro>",
 	Short: "Display Avro schema from file",
@@ -36,25 +32,27 @@ Examples:
 
 func init() {
 	rootCmd.AddCommand(schemaCmd)
-	schemaCmd.Flags().BoolVarP(&schemaPretty, "pretty", "p", false, "pretty-print JSON output")
+	schemaCmd.Flags().BoolP("pretty", "p", false, "pretty-print JSON output")
 }
 
 func runSchema(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 
-	// Открываем Avro файл
+	pretty, err := cmd.Flags().GetBool("pretty")
+	if err != nil {
+		return fmt.Errorf("internal error: %w", err)
+	}
+
 	avroReader, err := reader.NewAvroReader(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open avro file: %w", err)
 	}
 	defer avroReader.Close()
 
-	// Получаем схему
 	schema := avroReader.Schema()
 
-	// Конвертируем схему в JSON
 	var output []byte
-	if schemaPretty {
+	if pretty {
 		output, err = json.MarshalIndent(schema, "", "  ")
 	} else {
 		output, err = json.Marshal(schema)
@@ -64,8 +62,9 @@ func runSchema(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal schema: %w", err)
 	}
 
-	// Выводим
-	fmt.Fprintln(os.Stdout, string(output))
+	if _, err := fmt.Fprintf(os.Stdout, "%s\n", output); err != nil {
+		return fmt.Errorf("failed to write schema: %w", err)
+	}
 
 	return nil
 }
