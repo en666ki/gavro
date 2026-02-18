@@ -495,6 +495,32 @@ func TestQueryPrettyShortFlag(t *testing.T) {
 	}
 }
 
+// TestQueryStdin verifies reading from stdin via "-".
+func TestQueryStdin(t *testing.T) {
+	stdout, stderr, exitCode := runGavroWithStdin("../../tests/testdata/users.avro", "query", "-", "record.age > 28")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("Expected 2 matching records, got %d", len(lines))
+	}
+
+	var record1, record2 map[string]interface{}
+	if err := json.Unmarshal([]byte(lines[0]), &record1); err != nil {
+		t.Fatalf("Failed to parse line 0 as JSON: %v", err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &record2); err != nil {
+		t.Fatalf("Failed to parse line 1 as JSON: %v", err)
+	}
+
+	if record1["name"] != "Alice" || record2["name"] != "Charlie" {
+		t.Errorf("Expected Alice and Charlie, got %v and %v", record1["name"], record2["name"])
+	}
+}
+
 // TestQueryCompactByDefault verifies compact JSON output is the default.
 func TestQueryCompactByDefault(t *testing.T) {
 	stdout, _, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 28")

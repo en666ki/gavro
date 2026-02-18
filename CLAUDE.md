@@ -83,6 +83,12 @@ gavro q users.avro "record.name.startsWith('A')"
 # Count matching records
 gavro query users.avro "record.age > 18" --count
 
+# Read from stdin (use "-" as filename)
+cat users.avro | gavro cat -
+curl https://example.com/data.avro | gavro query - "record.status == 'ERROR'"
+cat users.avro | gavro select - record.name
+cat users.avro | gavro schema -
+
 # Filter records with jq
 gavro cat users.avro | jq 'select(.age > 18)'
 
@@ -94,10 +100,10 @@ gavro schema users.avro | jq '.fields[].name'
 
 | Command | Alias | Flags | Description |
 |---------|-------|-------|-------------|
-| `gavro cat <file.avro>` | — | `--pretty/-p`, `--limit/-n`, `--count/-c` | Output all Avro records as JSON Lines |
-| `gavro schema <file.avro>` | — | `--pretty/-p` | Display the Avro schema as JSON |
-| `gavro query <file.avro> <expr>` | `q` | `--pretty/-p`, `--limit/-n`, `--count/-c` | Filter records using CEL expressions |
-| `gavro select <file.avro> <field>...` | — | `--pretty/-p`, `--limit/-n`, `--count/-c` | Extract specific fields using dot notation (e.g. `record.name`) |
+| `gavro cat <file \| ->` | — | `--pretty/-p`, `--limit/-n`, `--count/-c` | Output all Avro records as JSON Lines |
+| `gavro schema <file \| ->` | — | `--pretty/-p` | Display the Avro schema as JSON |
+| `gavro query <file \| -> <expr>` | `q` | `--pretty/-p`, `--limit/-n`, `--count/-c` | Filter records using CEL expressions |
+| `gavro select <file \| -> <field>...` | — | `--pretty/-p`, `--limit/-n`, `--count/-c` | Extract specific fields using dot notation (e.g. `record.name`) |
 | `gavro --version` | `-v` | — | Show version (semver, git hash, or "dev") |
 
 All data-output commands support `--pretty`/`-p` for indented JSON with blank-line separators between records.
@@ -182,7 +188,7 @@ type Filter interface {
 
 1. **Reader Layer** (`internal/reader/`)
    - `Reader` interface: Defines contract for reading records from various sources
-   - `AvroReader`: Reads Avro OCF files using hamba/avro library
+   - `AvroReader`: Reads Avro OCF files using hamba/avro library; supports stdin via `"-"` path
    - Returns records as `map[string]interface{}` for flexibility
    - Automatically reads schema from Avro file headers
    - `Schema()` method exposes the parsed `avro.Schema` for the schema command

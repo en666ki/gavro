@@ -194,6 +194,29 @@ func TestSchemaWithJq(t *testing.T) {
 	}
 }
 
+// TestSchemaStdin verifies reading schema from stdin via "-".
+func TestSchemaStdin(t *testing.T) {
+	stdout, stderr, exitCode := runGavroWithStdin("../../tests/testdata/users.avro", "schema", "-")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	var schema map[string]interface{}
+	if err := json.Unmarshal([]byte(stdout), &schema); err != nil {
+		t.Fatalf("Output is not valid JSON: %v", err)
+	}
+
+	if schema["name"] != "User" {
+		t.Errorf("Expected schema name 'User', got %v", schema["name"])
+	}
+
+	fields, ok := schema["fields"].([]interface{})
+	if !ok || len(fields) != 3 {
+		t.Errorf("Expected 3 fields, got %v", fields)
+	}
+}
+
 func TestSchemaDifferentFiles(t *testing.T) {
 	testCases := []struct {
 		name           string

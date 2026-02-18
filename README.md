@@ -9,6 +9,7 @@ A fast CLI tool for working with Apache Avro files written in Go.
 - 🔍 **Powerful Filtering** - Built-in CEL (Common Expression Language) query engine
 - 🎨 **Pretty Output** - Human-readable formatting with `--pretty` flag
 - 🛡️ **Robust** - Comprehensive test coverage including fuzzing tests for security
+- 📥 **Stdin Support** - Use `-` to read from stdin for easy piping between tools
 - 🔧 **Extensible** - Clean architecture designed for easy feature additions
 
 ## Installation
@@ -56,6 +57,12 @@ gavro query users.avro "record.age >= 30 && record.name.startsWith('A')"
 gavro query users.avro "record.email.endsWith('@gmail.com')"
 gavro query users.avro "has(record.score) && record.score > 0.5"
 
+# Read from stdin (use "-" as filename)
+cat users.avro | gavro cat -
+curl https://example.com/data.avro | gavro query - "record.status == 'ERROR'"
+cat users.avro | gavro select - record.name
+cat users.avro | gavro schema -
+
 # Pipe to jq for further processing
 gavro cat users.avro | jq 'select(.age > 18)'
 gavro query users.avro "record.active == true" | jq '.name'
@@ -80,20 +87,20 @@ gavro schema users.avro | jq '.fields[].name'
 
 ### Commands
 
-- `gavro cat <file.avro>` - Output Avro file contents as JSON Lines
+- `gavro cat <file.avro | ->` - Output Avro file contents as JSON Lines (use `-` for stdin)
   - `--pretty, -p` - Pretty-print JSON with indentation
   - `--limit, -n` - Maximum number of records to output
   - `--count, -c` - Only print the number of records
-- `gavro query <file.avro> <expression>` - Filter records using CEL expressions
+- `gavro query <file.avro | -> <expression>` - Filter records using CEL expressions
   - Alias: `q`
   - `--pretty, -p` - Pretty-print JSON with indentation
   - `--limit, -n` - Maximum number of records to output
   - `--count, -c` - Only print the number of matching records
-- `gavro select <file.avro> <field>...` - Extract specific fields from records
+- `gavro select <file.avro | -> <field>...` - Extract specific fields from records
   - `--pretty, -p` - Pretty-print JSON with indentation
   - `--limit, -n` - Maximum number of records to output
   - `--count, -c` - Only print the number of records
-- `gavro schema <file.avro>` - Display Avro schema as JSON
+- `gavro schema <file.avro | ->` - Display Avro schema as JSON
   - `--pretty, -p` - Pretty-print JSON with indentation
 - `gavro --help` - Show help
 - `gavro --version` - Show version
@@ -221,7 +228,7 @@ Features:
 Future features planned:
 - [ ] `gavro convert` - Convert between formats (Avro ↔ JSON ↔ CSV)
 - [ ] `gavro stats` - Show statistics about Avro file
-- [ ] Support for reading from stdin
+- [x] Support for reading from stdin (use `-` as filename) ✅
 - [x] `--limit` flag for output records ✅
 - [x] `--count` flag to only count matches ✅
 
