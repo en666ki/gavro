@@ -56,34 +56,30 @@ Examples:
 func init() {
 	rootCmd.AddCommand(queryCmd)
 	queryCmd.Flags().BoolP("pretty", "p", false, "pretty-print JSON with indentation")
-	// Будущие флаги:
-	// queryCmd.Flags().IntP("limit", "n", 0, "limit number of results")
-	// queryCmd.Flags().BoolP("count", "c", false, "only count matching records")
 }
 
 func runQuery(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 	expression := args[1]
-	pretty, _ := cmd.Flags().GetBool("pretty")
+	pretty, err := cmd.Flags().GetBool("pretty")
+	if err != nil {
+		return fmt.Errorf("internal error: %w", err)
+	}
 
-	// Создаем CEL фильтр
 	celFilter, err := filter.NewCELFilter(expression)
 	if err != nil {
 		return fmt.Errorf("invalid expression: %w", err)
 	}
 
-	// Открываем Avro файл
 	avroReader, err := reader.NewAvroReader(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open avro file: %w", err)
 	}
 	defer avroReader.Close()
 
-	// Создаем JSON Lines writer
 	jsonWriter := writer.NewJSONLinesWriter(os.Stdout, pretty)
 
-	// Обрабатываем файл с фильтрацией
-	proc := processor.NewFilteringProcessor(avroReader, jsonWriter, celFilter)
+	proc := processor.NewProcessor(avroReader, jsonWriter, processor.WithFilter(celFilter))
 	if err := proc.Process(); err != nil {
 		return fmt.Errorf("processing failed: %w", err)
 	}

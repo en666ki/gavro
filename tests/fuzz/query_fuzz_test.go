@@ -7,9 +7,8 @@ import (
 	"testing"
 )
 
-// FuzzQueryExpression тестирует query на случайных CEL выражениях
+// FuzzQueryExpression tests the query command against random CEL expressions.
 func FuzzQueryExpression(f *testing.F) {
-	// Seed corpus - валидные выражения
 	validExpressions := []string{
 		"record.age > 18",
 		"record.age >= 30 && record.name.startsWith('A')",
@@ -28,38 +27,32 @@ func FuzzQueryExpression(f *testing.F) {
 		f.Add(expr)
 	}
 
-	// Добавляем известные проблемные случаи
-	f.Add("")                            // пустое выражение
-	f.Add("record.")                     // неполное
-	f.Add("record.age >")                // неполное
-	f.Add("record..age > 18")            // двойная точка
-	f.Add("(record.age > 18")            // незакрытая скобка
-	f.Add("record.age >>> 18")           // неправильный оператор
-	f.Add(strings.Repeat("(", 100))      // много скобок
-	f.Add(strings.Repeat("record.", 50)) // повторения
+	f.Add("")                            // empty expression
+	f.Add("record.")                     // incomplete
+	f.Add("record.age >")                // incomplete
+	f.Add("record..age > 18")            // double dot
+	f.Add("(record.age > 18")            // unclosed paren
+	f.Add("record.age >>> 18")           // invalid operator
+	f.Add(strings.Repeat("(", 100))      // many parens
+	f.Add(strings.Repeat("record.", 50)) // repeated prefix
 
 	f.Fuzz(func(t *testing.T, expression string) {
-		// Запускаем query с этим выражением
 		cmd := exec.Command("/tmp/gavro", "query", "../../tests/testdata/users.avro", expression)
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 
-		// Главное - программа не должна паниковать
 		_ = cmd.Run()
 
 		stderrStr := stderr.String()
 
-		// Проверяем что нет паники
 		if strings.Contains(stderrStr, "panic") {
 			t.Errorf("Program panicked on expression: %s\nStderr: %s", expression, stderrStr)
 		}
 
-		// Проверяем что нет runtime errors
 		if strings.Contains(stderrStr, "runtime error") {
 			t.Errorf("Runtime error on expression: %s\nStderr: %s", expression, stderrStr)
 		}
 
-		// Exit code должен быть 0 или 1 (не segfault)
 		if cmd.ProcessState != nil {
 			exitCode := cmd.ProcessState.ExitCode()
 			if exitCode < -1 {
@@ -69,9 +62,8 @@ func FuzzQueryExpression(f *testing.F) {
 	})
 }
 
-// FuzzQueryExpressionInjection проверяет SQL/code injection атаки
+// FuzzQueryExpressionInjection verifies CEL safely handles injection attempts.
 func FuzzQueryExpressionInjection(f *testing.F) {
-	// Попытки инжектов
 	injections := []string{
 		"'; DROP TABLE users; --",
 		"1 OR 1=1",
@@ -95,16 +87,12 @@ func FuzzQueryExpressionInjection(f *testing.F) {
 
 		_ = cmd.Run()
 
-		// CEL должен безопасно обработать любые инжекты
-		// Не должно быть паники или выполнения команд
 		stderrStr := stderr.String()
 
 		if strings.Contains(stderrStr, "panic") {
 			t.Errorf("Panic on injection attempt: %s", expression)
 		}
 
-		// Проверяем что не выполнились системные команды
-		// (по идее CEL это не позволит, но проверим)
 		if strings.Contains(stderrStr, "command not found") ||
 			strings.Contains(stderrStr, "sh:") ||
 			strings.Contains(stderrStr, "bash:") {
@@ -113,9 +101,8 @@ func FuzzQueryExpressionInjection(f *testing.F) {
 	})
 }
 
-// FuzzQueryLongExpression тестирует очень длинные выражения
+// FuzzQueryLongExpression tests that very long expressions do not cause crashes.
 func FuzzQueryLongExpression(f *testing.F) {
-	// Seed с разными длинами
 	lengths := []int{100, 1000, 10000}
 
 	for _, length := range lengths {
@@ -127,7 +114,6 @@ func FuzzQueryLongExpression(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, expression string) {
-		// Ограничиваем длину чтобы не зависнуть
 		if len(expression) > 100000 {
 			t.Skip()
 		}
@@ -146,7 +132,7 @@ func FuzzQueryLongExpression(f *testing.F) {
 	})
 }
 
-// FuzzQuerySpecialCharacters тестирует специальные символы
+// FuzzQuerySpecialCharacters tests that special characters in expressions do not cause crashes.
 func FuzzQuerySpecialCharacters(f *testing.F) {
 	specialChars := []string{
 		"\x00",         // null byte

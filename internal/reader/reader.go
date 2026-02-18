@@ -1,13 +1,13 @@
 package reader
 
-// Record представляет одну запись из источника данных
+// Record represents a single record from a data source.
 type Record map[string]interface{}
 
-// Reader - интерфейс для чтения записей из различных источников
+// Reader reads records from a data source.
 type Reader interface {
-	// Read читает следующую запись. Возвращает io.EOF когда данные закончились
+	// Read returns the next record. Returns io.EOF when all records are exhausted.
 	Read() (Record, error)
 
-	// Close закрывает ресурсы
+	// Close releases any resources held by the reader.
 	Close() error
 }

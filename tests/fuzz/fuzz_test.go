@@ -2,15 +2,16 @@ package fuzz
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
-// FuzzAvroReader тестирует reader на случайных входных данных
+// FuzzAvroReader tests the reader against random input data.
 func FuzzAvroReader(f *testing.F) {
-	// Добавляем seed корпус - валидные файлы
 	seedFiles := []string{
 		"../../tests/testdata/users.avro",
 		"../../tests/testdata/complex.avro",
@@ -23,31 +24,25 @@ func FuzzAvroReader(f *testing.F) {
 		}
 	}
 
-	// Добавляем известные проблемные случаи
-	f.Add([]byte{})                                      // пустой файл
-	f.Add([]byte("Obj\x01"))                             // начало Avro magic но обрезано
-	f.Add([]byte("Obj\x01" + string(make([]byte, 100)))) // magic + мусор
-	f.Add(make([]byte, 1024))                            // нули
+	f.Add([]byte{})                                      // empty file
+	f.Add([]byte("Obj\x01"))                             // truncated Avro magic
+	f.Add([]byte("Obj\x01" + string(make([]byte, 100)))) // magic + garbage
+	f.Add(make([]byte, 1024))                            // all zeros
 
-	// Добавляем файл с неправильным magic
 	f.Add([]byte("NOT_AVRO_HEADER"))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		// Создаем временный файл
 		tmpFile := filepath.Join(t.TempDir(), "fuzz.avro")
 		if err := os.WriteFile(tmpFile, data, 0644); err != nil {
 			t.Skip()
 		}
 
-		// Запускаем gavro cat на этом файле
 		cmd := exec.Command("/tmp/gavro", "cat", tmpFile)
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 
-		// Главное - программа не должна паниковать или зависать
 		_ = cmd.Run()
 
-		// Проверяем что нет паники
 		stderrStr := stderr.String()
 		if bytes.Contains([]byte(stderrStr), []byte("panic")) {
 			t.Errorf("Program panicked on input: %v", stderrStr)
@@ -56,8 +51,6 @@ func FuzzAvroReader(f *testing.F) {
 			t.Errorf("Runtime error on input: %v", stderrStr)
 		}
 
-		// Ожидаем либо успех (exit 0) либо нормальную ошибку (exit 1)
-		// Но не segfault (exit -11, -6, etc)
 		if cmd.ProcessState != nil {
 			exitCode := cmd.ProcessState.ExitCode()
 			if exitCode < -1 {
@@ -67,16 +60,14 @@ func FuzzAvroReader(f *testing.F) {
 	})
 }
 
-// FuzzAvroMutation мутирует валидные Avro файлы
+// FuzzAvroMutation mutates valid Avro files and tests robustness.
 func FuzzAvroMutation(f *testing.F) {
-	// Читаем валидный файл как базу
 	validData, err := os.ReadFile("../../tests/testdata/users.avro")
 	if err != nil {
 		f.Skip("Cannot read valid test file")
 	}
 
-	// Seed corpus - различные мутации валидного файла
-	f.Add(validData, 0, byte(0)) // замена байта на позиции
+	f.Add(validData, 0, byte(0))
 	f.Add(validData, 10, byte(255))
 	f.Add(validData, len(validData)/2, byte(128))
 
@@ -85,7 +76,6 @@ func FuzzAvroMutation(f *testing.F) {
 			t.Skip()
 		}
 
-		// Мутируем данные
 		mutated := make([]byte, len(data))
 		copy(mutated, data)
 
@@ -93,20 +83,17 @@ func FuzzAvroMutation(f *testing.F) {
 			mutated[pos] = val
 		}
 
-		// Создаем временный файл
 		tmpFile := filepath.Join(t.TempDir(), "mutated.avro")
 		if err := os.WriteFile(tmpFile, mutated, 0644); err != nil {
 			t.Skip()
 		}
 
-		// Тестируем
 		cmd := exec.Command("/tmp/gavro", "cat", tmpFile)
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 
 		_ = cmd.Run()
 
-		// Не должно быть паники или краша
 		stderrStr := stderr.String()
 		if bytes.Contains([]byte(stderrStr), []byte("panic")) {
 			t.Errorf("Panic on mutated file at pos %d: %v", pos, stderrStr)
@@ -114,14 +101,13 @@ func FuzzAvroMutation(f *testing.F) {
 	})
 }
 
-// FuzzAvroTruncation тестирует обрезанные файлы
+// FuzzAvroTruncation tests truncated Avro files at various cut points.
 func FuzzAvroTruncation(f *testing.F) {
 	validData, err := os.ReadFile("../../tests/testdata/users.avro")
 	if err != nil {
 		f.Skip("Cannot read valid test file")
 	}
 
-	// Seeds - обрезаем файл в разных местах
 	for i := 0; i <= 100; i += 10 {
 		cutPos := len(validData) * i / 100
 		f.Add(validData[:cutPos])
@@ -139,7 +125,6 @@ func FuzzAvroTruncation(f *testing.F) {
 
 		_ = cmd.Run()
 
-		// Программа должна корректно обработать неполные данные
 		stderrStr := stderr.String()
 		if bytes.Contains([]byte(stderrStr), []byte("panic")) {
 			t.Errorf("Panic on truncated file: %v", stderrStr)
@@ -150,9 +135,8 @@ func FuzzAvroTruncation(f *testing.F) {
 	})
 }
 
-// FuzzAvroLargeInput тестирует очень большие входные данные
+// FuzzAvroLargeInput tests that large inputs do not cause crashes or hangs.
 func FuzzAvroLargeInput(f *testing.F) {
-	// Проверяем что программа не падает на больших входных данных
 	sizes := []int{1024, 10 * 1024, 100 * 1024, 1024 * 1024}
 
 	for _, size := range sizes {
@@ -164,7 +148,7 @@ func FuzzAvroLargeInput(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		if len(data) > 10*1024*1024 { // ограничиваем 10MB
+		if len(data) > 10*1024*1024 { // limit to 10MB
 			t.Skip()
 		}
 
@@ -173,20 +157,14 @@ func FuzzAvroLargeInput(f *testing.F) {
 			t.Skip()
 		}
 
-		cmd := exec.Command("/tmp/gavro", "cat", tmpFile)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "/tmp/gavro", "cat", tmpFile)
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 
-		// Добавляем timeout чтобы не зависнуть
-		done := make(chan error, 1)
-		go func() {
-			done <- cmd.Run()
-		}()
-
-		select {
-		case <-done:
-			// OK, завершилось
-		}
+		_ = cmd.Run()
 
 		stderrStr := stderr.String()
 		if bytes.Contains([]byte(stderrStr), []byte("panic")) {
@@ -195,16 +173,15 @@ func FuzzAvroLargeInput(f *testing.F) {
 	})
 }
 
-// FuzzAvroSpecialBytes тестирует специальные байтовые последовательности
+// FuzzAvroSpecialBytes tests known-problematic byte patterns.
 func FuzzAvroSpecialBytes(f *testing.F) {
-	// Добавляем известные проблемные паттерны
 	specialCases := [][]byte{
-		{0x00, 0x00, 0x00, 0x00},             // нули
-		{0xFF, 0xFF, 0xFF, 0xFF},             // единицы
+		{0x00, 0x00, 0x00, 0x00},             // all zeros
+		{0xFF, 0xFF, 0xFF, 0xFF},             // all ones
 		{0x4F, 0x62, 0x6A, 0x01},             // Avro magic "Obj\x01"
 		{0x4F, 0x62, 0x6A, 0x01, 0x00},       // Avro magic + null
-		bytes.Repeat([]byte{0x41}, 100),      // повторяющиеся символы
-		bytes.Repeat([]byte{0x00, 0xFF}, 50), // чередование
+		bytes.Repeat([]byte{0x41}, 100),      // repeated bytes
+		bytes.Repeat([]byte{0x00, 0xFF}, 50), // alternating bytes
 	}
 
 	for _, data := range specialCases {
@@ -230,26 +207,15 @@ func FuzzAvroSpecialBytes(f *testing.F) {
 	})
 }
 
-// Утилита для min (для Go < 1.21)
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// TestFuzzPrerequisites проверяет что тестовые данные на месте
+// TestFuzzPrerequisites checks that the binary and test data are present.
 func TestFuzzPrerequisites(t *testing.T) {
-	// Проверяем что gavro собран
 	if _, err := os.Stat("/tmp/gavro"); os.IsNotExist(err) {
-		// Собираем
 		cmd := exec.Command("go", "build", "-o", "/tmp/gavro", "../../main.go")
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("Failed to build gavro: %v", err)
 		}
 	}
 
-	// Проверяем что тестовые данные сгенерированы
 	testFiles := []string{
 		"../../tests/testdata/users.avro",
 		"../../tests/testdata/complex.avro",
@@ -258,7 +224,6 @@ func TestFuzzPrerequisites(t *testing.T) {
 
 	for _, file := range testFiles {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
-			// Генерируем
 			cmd := exec.Command("go", "run", "../../tests/testdata/generate.go")
 			cmd.Dir = "../.."
 			if err := cmd.Run(); err != nil {

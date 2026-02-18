@@ -7,17 +7,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version информация о версии
+// Version holds the build version of the binary.
 var Version = getVersion()
 
 func getVersion() string {
-	// Для go install - берем версию из BuildInfo
 	if info, ok := debug.ReadBuildInfo(); ok {
-		// Приоритет: Main.Version (при go install github.com/user/repo@v1.2.3)
 		if info.Main.Version != "" && info.Main.Version != "(devel)" {
 			return info.Main.Version
 		}
-		// Если нет версии - берем git hash (для локальной разработки)
 		for _, setting := range info.Settings {
 			if setting.Key == "vcs.revision" {
 				if len(setting.Value) > 7 {
@@ -48,6 +45,4 @@ func Execute() {
 }
 
 func init() {
-	// Глобальные флаги можно добавить здесь в будущем
-	// rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
 }

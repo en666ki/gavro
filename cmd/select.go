@@ -1,15 +1,15 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/en666ki/gavro/internal/processor"
 	"github.com/en666ki/gavro/internal/reader"
+	"github.com/en666ki/gavro/internal/writer"
 )
 
 var selectCmd = &cobra.Command{
@@ -50,87 +50,102 @@ func init() {
 func runSelect(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 	fieldPaths := args[1:]
-	pretty, _ := cmd.Flags().GetBool("pretty")
+	pretty, err := cmd.Flags().GetBool("pretty")
+	if err != nil {
+		return fmt.Errorf("internal error: %w", err)
+	}
 
-	// Открываем Avro файл
 	avroReader, err := reader.NewAvroReader(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open avro file: %w", err)
 	}
 	defer avroReader.Close()
 
-	// Создаем JSON encoder для вывода
-	encoder := json.NewEncoder(os.Stdout)
-	if pretty {
-		encoder.SetIndent("", "  ")
+	jsonWriter := writer.NewJSONLinesWriter(os.Stdout, pretty)
+
+	transform, err := makeSelectTransform(fieldPaths)
+	if err != nil {
+		return err
 	}
-
-	// Читаем и обрабатываем записи
-	for {
-		record, err := avroReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("read error: %w", err)
-		}
-
-		// Извлекаем поля
-		if len(fieldPaths) == 1 {
-			// Одно поле - выводим просто значение
-			value, err := extractField(record, fieldPaths[0])
-			if err != nil {
-				return fmt.Errorf("field %s: %w", fieldPaths[0], err)
-			}
-			if err := encoder.Encode(value); err != nil {
-				return fmt.Errorf("encode error: %w", err)
-			}
-		} else {
-			// Несколько полей - выводим объект
-			result := make(map[string]interface{})
-			for _, path := range fieldPaths {
-				value, err := extractField(record, path)
-				if err != nil {
-					return fmt.Errorf("field %s: %w", path, err)
-				}
-				result[path] = value
-			}
-			if err := encoder.Encode(result); err != nil {
-				return fmt.Errorf("encode error: %w", err)
-			}
-		}
+	proc := processor.NewProcessor(avroReader, jsonWriter, processor.WithTransform(transform))
+	if err := proc.Process(); err != nil {
+		return fmt.Errorf("processing failed: %w", err)
 	}
 
 	return nil
 }
 
-// extractField извлекает значение по пути вида "record.a.b.c" из map[string]interface{}
-func extractField(record map[string]interface{}, path string) (interface{}, error) {
-	// Проверяем что путь начинается с "record."
+type parsedField struct {
+	original string
+	key      string
+	parts    []string
+}
+
+func parseField(path string) (parsedField, error) {
 	const recordPrefix = "record."
 	if !strings.HasPrefix(path, recordPrefix) {
-		return nil, fmt.Errorf("field path must start with 'record.' (got '%s')", path)
+		return parsedField{}, fmt.Errorf("field path must start with 'record.' (got '%s')", path)
 	}
 
-	// Убираем префикс "record." и разбиваем на части
-	fieldPath := strings.TrimPrefix(path, recordPrefix)
-	if fieldPath == "" {
-		return nil, fmt.Errorf("field path cannot be just 'record'")
+	key := strings.TrimPrefix(path, recordPrefix)
+	if key == "" {
+		return parsedField{}, fmt.Errorf("field path cannot be just 'record'")
 	}
 
-	parts := strings.Split(fieldPath, ".")
+	return parsedField{
+		original: path,
+		key:      key,
+		parts:    strings.Split(key, "."),
+	}, nil
+}
+
+func makeSelectTransform(fieldPaths []string) (func(reader.Record) (interface{}, error), error) {
+	parsed := make([]parsedField, len(fieldPaths))
+	for i, path := range fieldPaths {
+		pf, err := parseField(path)
+		if err != nil {
+			return nil, err
+		}
+		parsed[i] = pf
+	}
+
+	if len(parsed) == 1 {
+		pf := parsed[0]
+		return func(record reader.Record) (interface{}, error) {
+			value, err := extractField(record, pf)
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", pf.original, err)
+			}
+			return value, nil
+		}, nil
+	}
+
+	return func(record reader.Record) (interface{}, error) {
+		result := make(map[string]interface{}, len(parsed))
+		for _, pf := range parsed {
+			value, err := extractField(record, pf)
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", pf.original, err)
+			}
+			result[pf.key] = value
+		}
+		return result, nil
+	}, nil
+}
+
+func extractField(record map[string]interface{}, pf parsedField) (interface{}, error) {
 	var current interface{} = record
 
-	for i, part := range parts {
+	for i, part := range pf.parts {
 		m, ok := current.(map[string]interface{})
 		if !ok {
 			return nil, fmt.Errorf("cannot access field '%s': parent is not an object (at 'record.%s')",
-				part, strings.Join(parts[:i], "."))
+				part, strings.Join(pf.parts[:i], "."))
 		}
 
 		value, exists := m[part]
 		if !exists {
-			return nil, fmt.Errorf("field '%s' does not exist (full path: '%s')", part, path)
+			return nil, fmt.Errorf("field '%s' does not exist (full path: '%s')", part, pf.original)
 		}
 
 		current = value

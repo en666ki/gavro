@@ -18,10 +18,13 @@ func TestQuerySimpleFilter(t *testing.T) {
 		t.Fatalf("Expected 2 matching records (Alice and Charlie), got %d", len(lines))
 	}
 
-	// Проверяем что это правильные записи
 	var record1, record2 map[string]interface{}
-	json.Unmarshal([]byte(lines[0]), &record1)
-	json.Unmarshal([]byte(lines[1]), &record2)
+	if err := json.Unmarshal([]byte(lines[0]), &record1); err != nil {
+		t.Fatalf("Failed to parse line 0 as JSON: %v", err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &record2); err != nil {
+		t.Fatalf("Failed to parse line 1 as JSON: %v", err)
+	}
 
 	if record1["name"] != "Alice" || record2["name"] != "Charlie" {
 		t.Errorf("Expected Alice and Charlie, got %v and %v", record1["name"], record2["name"])
@@ -80,7 +83,6 @@ func TestQueryComplexFilter(t *testing.T) {
 				t.Errorf("Expected %d records, got %d", tc.expectedCount, len(lines))
 			}
 
-			// Проверяем имена
 			for i, line := range lines {
 				if line == "" {
 					continue
@@ -113,7 +115,9 @@ func TestQueryAliasQ(t *testing.T) {
 	}
 
 	var record map[string]interface{}
-	json.Unmarshal([]byte(lines[0]), &record)
+	if err := json.Unmarshal([]byte(lines[0]), &record); err != nil {
+		t.Fatalf("Failed to parse line 0 as JSON: %v", err)
+	}
 	if record["name"] != "Bob" {
 		t.Errorf("Expected Bob, got %v", record["name"])
 	}
@@ -228,19 +232,16 @@ func TestQueryJSONLinesFormat(t *testing.T) {
 
 	lines := strings.Split(strings.TrimSpace(stdout), "\n")
 	for i, line := range lines {
-		// Каждая строка должна быть валидным JSON
 		var record map[string]interface{}
 		if err := json.Unmarshal([]byte(line), &record); err != nil {
 			t.Errorf("Line %d is not valid JSON: %v", i, err)
 		}
 
-		// Не должно быть запятых в конце
 		if strings.HasSuffix(line, ",") {
 			t.Errorf("Line %d should not end with comma", i)
 		}
 	}
 
-	// Не должно быть массива
 	if strings.HasPrefix(stdout, "[") {
 		t.Error("Output should not be a JSON array")
 	}
@@ -274,7 +275,7 @@ func TestQueryBooleanLogic(t *testing.T) {
 		expression    string
 		expectedCount int
 	}{
-		{"AND both true", "record.age > 25 && record.age < 35", 1},                     // Charlie: 30
+		{"AND both true", "record.age > 25 && record.age < 35", 1},                     // Alice (30)
 		{"OR", "record.age < 26 || record.age > 34", 2},                                // Bob (25), Charlie (35)
 		{"NOT", "!(record.age == 25)", 2},                                              // Alice, Charlie
 		{"Complex", "(record.age > 25 && record.age < 35) || record.name == 'Bob'", 2}, // Alice (30), Bob (25)
@@ -301,7 +302,7 @@ func TestQueryBooleanLogic(t *testing.T) {
 	}
 }
 
-// Benchmark: query vs cat
+// BenchmarkQueryVsCat compares query and cat throughput on large files.
 func BenchmarkQueryVsCat(b *testing.B) {
 	b.Run("cat_large_file", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -328,7 +329,7 @@ func BenchmarkQueryVsCat(b *testing.B) {
 	})
 }
 
-// Benchmark: разные типы фильтров
+// BenchmarkQueryFilterTypes benchmarks different filter types.
 func BenchmarkQueryFilterTypes(b *testing.B) {
 	b.Run("numeric_comparison", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -349,7 +350,7 @@ func BenchmarkQueryFilterTypes(b *testing.B) {
 	})
 }
 
-// Benchmark: селективность фильтра
+// BenchmarkQuerySelectivity benchmarks query at various filter selectivities.
 func BenchmarkQuerySelectivity(b *testing.B) {
 	b.Run("select_100_percent", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -376,7 +377,7 @@ func BenchmarkQuerySelectivity(b *testing.B) {
 	})
 }
 
-// Тест --pretty флага для query
+// TestQueryPrettyFlag verifies the --pretty flag produces indented output.
 func TestQueryPrettyFlag(t *testing.T) {
 	stdout, _, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 28", "--pretty")
 
@@ -384,23 +385,19 @@ func TestQueryPrettyFlag(t *testing.T) {
 		t.Fatal("query --pretty failed")
 	}
 
-	// Проверяем что есть отступы (признак pretty-print)
 	if !strings.Contains(stdout, "  \"age\"") {
 		t.Error("Output should contain indented fields")
 	}
 
-	// Проверяем что между записями есть пустые строки
 	if !strings.Contains(stdout, "}\n\n{") {
 		t.Error("Records should be separated by blank lines in pretty mode")
 	}
 
-	// Разделяем по пустым строкам
 	records := strings.Split(strings.TrimSpace(stdout), "\n\n")
 	if len(records) != 2 {
 		t.Errorf("Expected 2 matching records separated by blank lines, got %d", len(records))
 	}
 
-	// Каждая запись должна быть валидным JSON
 	for i, record := range records {
 		var obj map[string]interface{}
 		if err := json.Unmarshal([]byte(record), &obj); err != nil {
@@ -409,7 +406,7 @@ func TestQueryPrettyFlag(t *testing.T) {
 	}
 }
 
-// Тест короткого флага -p для query
+// TestQueryPrettyShortFlag verifies the -p short flag produces indented output.
 func TestQueryPrettyShortFlag(t *testing.T) {
 	stdout, _, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 28", "-p")
 
@@ -417,13 +414,12 @@ func TestQueryPrettyShortFlag(t *testing.T) {
 		t.Fatal("query -p failed")
 	}
 
-	// Проверяем что есть отступы
 	if !strings.Contains(stdout, "  \"age\"") {
 		t.Error("Output should contain indented fields with -p flag")
 	}
 }
 
-// Тест что query без флага выводит компактный JSON
+// TestQueryCompactByDefault verifies compact JSON output is the default.
 func TestQueryCompactByDefault(t *testing.T) {
 	stdout, _, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 28")
 
@@ -431,17 +427,14 @@ func TestQueryCompactByDefault(t *testing.T) {
 		t.Fatal("query failed")
 	}
 
-	// Проверяем что НЕТ отступов (компактный JSON)
 	lines := strings.Split(strings.TrimSpace(stdout), "\n")
 
-	// Каждая строка должна начинаться с {, а не с пробелов
 	for i, line := range lines {
 		if !strings.HasPrefix(line, "{") {
 			t.Errorf("Line %d should start with '{' in compact mode", i)
 		}
 	}
 
-	// Не должно быть пустых строк между записями
 	if strings.Contains(stdout, "\n\n") {
 		t.Error("Should not have blank lines between records in compact mode")
 	}

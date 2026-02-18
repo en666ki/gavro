@@ -11,16 +11,13 @@ import (
 
 const binaryName = "gavro"
 
-// TestMain билдит бинарник перед запуском тестов
+// TestMain builds the binary before running tests.
 func TestMain(m *testing.M) {
-	// Билдим gavro в /tmp
 	build := exec.Command("go", "build", "-o", "/tmp/"+binaryName, "../../main.go")
 	if err := build.Run(); err != nil {
 		panic("Failed to build binary: " + err.Error())
 	}
 
-	// Проверяем что тестовые данные существуют
-	// Если нет - нужно запустить: go run tests/testdata/generate.go
 	testFiles := []string{
 		"../../tests/testdata/users.avro",
 		"../../tests/testdata/complex.avro",
@@ -73,14 +70,12 @@ func TestCatSimpleUsers(t *testing.T) {
 		t.Fatalf("Expected 3 lines, got %d", len(lines))
 	}
 
-	// Проверяем что каждая строка - валидный JSON
 	for i, line := range lines {
 		var record map[string]interface{}
 		if err := json.Unmarshal([]byte(line), &record); err != nil {
 			t.Errorf("Line %d is not valid JSON: %v", i, err)
 		}
 
-		// Проверяем наличие полей
 		if _, ok := record["name"]; !ok {
 			t.Errorf("Line %d missing 'name' field", i)
 		}
@@ -92,9 +87,10 @@ func TestCatSimpleUsers(t *testing.T) {
 		}
 	}
 
-	// Проверяем конкретные значения
 	var firstUser map[string]interface{}
-	json.Unmarshal([]byte(lines[0]), &firstUser)
+	if err := json.Unmarshal([]byte(lines[0]), &firstUser); err != nil {
+		t.Fatalf("Failed to parse first line as JSON: %v", err)
+	}
 	if firstUser["name"] != "Alice" {
 		t.Errorf("Expected first user to be Alice, got %v", firstUser["name"])
 	}
@@ -112,23 +108,19 @@ func TestCatComplexSchema(t *testing.T) {
 		t.Fatalf("Expected 2 lines, got %d", len(lines))
 	}
 
-	// Проверяем первую запись с вложенными структурами
 	var record map[string]interface{}
 	if err := json.Unmarshal([]byte(lines[0]), &record); err != nil {
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
 
-	// Проверяем массив
 	if tags, ok := record["tags"].([]interface{}); !ok || len(tags) != 3 {
 		t.Errorf("Expected tags array with 3 elements, got %v", record["tags"])
 	}
 
-	// Проверяем map
 	if metadata, ok := record["metadata"].(map[string]interface{}); !ok || len(metadata) != 2 {
 		t.Errorf("Expected metadata map with 2 elements, got %v", record["metadata"])
 	}
 
-	// Проверяем вложенный record
 	if nested, ok := record["nested"].(map[string]interface{}); !ok {
 		t.Errorf("Expected nested record, got %v", record["nested"])
 	} else {
@@ -162,7 +154,6 @@ func TestCatLargeFile(t *testing.T) {
 		t.Errorf("Expected 10000 lines, got %d", len(lines))
 	}
 
-	// Проверяем случайные строки
 	for _, idx := range []int{0, 500, 5000, 9999} {
 		var record map[string]interface{}
 		if err := json.Unmarshal([]byte(lines[idx]), &record); err != nil {
@@ -203,7 +194,6 @@ func TestCatInvalidAvroFile(t *testing.T) {
 				t.Errorf("Expected non-zero exit code for invalid file %s", tc.file)
 			}
 
-			// Программа должна выдать ошибку, а не упасть
 			if stderr == "" {
 				t.Error("Expected error message in stderr")
 			}
@@ -224,29 +214,35 @@ func TestCatNoArgs(t *testing.T) {
 }
 
 func TestCatWithJq(t *testing.T) {
-	// Проверяем что jq есть
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skip("jq not found, skipping integration test")
 	}
 
-	// gavro cat | jq 'select(.age > 28)'
 	gavroCmd := exec.Command("/tmp/"+binaryName, "cat", "../../tests/testdata/users.avro")
 	jqCmd := exec.Command("jq", "select(.age > 28)")
 
 	var output bytes.Buffer
-	jqCmd.Stdin, _ = gavroCmd.StdoutPipe()
+	pipe, err := gavroCmd.StdoutPipe()
+	if err != nil {
+		t.Fatalf("Failed to create stdout pipe: %v", err)
+	}
+	jqCmd.Stdin = pipe
 	jqCmd.Stdout = &output
 
-	jqCmd.Start()
-	gavroCmd.Run()
-	jqCmd.Wait()
+	if err := jqCmd.Start(); err != nil {
+		t.Fatalf("Failed to start jq: %v", err)
+	}
+	if err := gavroCmd.Run(); err != nil {
+		t.Fatalf("gavro command failed: %v", err)
+	}
+	if err := jqCmd.Wait(); err != nil {
+		t.Fatalf("jq command failed: %v", err)
+	}
 
 	result := output.String()
 
-	// jq выводит в pretty format с отступами, поэтому считаем только объекты (строки с "name")
 	nameLines := strings.Count(result, `"name"`)
 
-	// Должны остаться только Alice (30) и Charlie (35)
 	if nameLines != 2 {
 		t.Errorf("Expected 2 filtered results, got %d. Output:\n%s", nameLines, result)
 	}
@@ -269,20 +265,16 @@ func TestCatOutputFormat(t *testing.T) {
 		t.Fatal("gavro cat failed")
 	}
 
-	// Проверяем формат JSON Lines: каждая строка - отдельный JSON объект
 	lines := strings.Split(strings.TrimSpace(stdout), "\n")
 	for i, line := range lines {
-		// Не должно быть запятых в конце
 		if strings.HasSuffix(line, ",") {
 			t.Errorf("Line %d should not end with comma", i)
 		}
 
-		// Не должно быть массива
 		if strings.HasPrefix(stdout, "[") {
 			t.Error("Output should not be a JSON array")
 		}
 
-		// Каждая строка должна быть валидным JSON объектом
 		var obj map[string]interface{}
 		if err := json.Unmarshal([]byte(line), &obj); err != nil {
 			t.Errorf("Line %d is not valid JSON object: %v", i, err)
@@ -320,9 +312,8 @@ func TestCatHelp(t *testing.T) {
 	}
 }
 
-// Benchmark для проверки производительности
+// BenchmarkCatLargeFile benchmarks cat on a large Avro file.
 func BenchmarkCatLargeFile(b *testing.B) {
-	// Генерируем файл если его нет
 	if _, err := os.Stat("../../tests/testdata/large.avro"); os.IsNotExist(err) {
 		generate := exec.Command("go", "run", "../testdata/generate.go")
 		generate.Dir = "../.."
@@ -332,18 +323,17 @@ func BenchmarkCatLargeFile(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cmd := exec.Command("/tmp/"+binaryName, "cat", "../../tests/testdata/large.avro")
-		cmd.Stdout = nil // Не выводим в stdout
+		cmd.Stdout = nil
 		cmd.Run()
 	}
 }
 
-// Тест на утечки памяти при обработке больших файлов
+// TestCatMemoryUsage verifies cat does not leak memory across repeated runs.
 func TestCatMemoryUsage(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping memory test in short mode")
 	}
 
-	// Запускаем несколько раз подряд - не должно быть утечек
 	for i := 0; i < 5; i++ {
 		_, _, exitCode := runGavro("cat", "../../tests/testdata/large.avro")
 		if exitCode != 0 {
@@ -352,9 +342,8 @@ func TestCatMemoryUsage(t *testing.T) {
 	}
 }
 
-// Тест проверяет что gavro правильно закрывает файлы
+// TestCatFileHandles verifies cat closes file handles correctly.
 func TestCatFileHandles(t *testing.T) {
-	// Открываем файл много раз - не должно быть "too many open files"
 	for i := 0; i < 100; i++ {
 		_, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro")
 		if exitCode != 0 {
@@ -363,11 +352,11 @@ func TestCatFileHandles(t *testing.T) {
 	}
 }
 
-// Тест на работу с файлами в разных директориях
+// TestCatWithDifferentPaths verifies cat works with various path formats.
 func TestCatWithDifferentPaths(t *testing.T) {
 	testCases := []string{
-		"../../tests/testdata/users.avro",             // relative from test dir
-		"../../tests/testdata/../testdata/users.avro", // with ..
+		"../../tests/testdata/users.avro",
+		"../../tests/testdata/../testdata/users.avro",
 	}
 
 	for _, path := range testCases {
@@ -380,7 +369,7 @@ func TestCatWithDifferentPaths(t *testing.T) {
 	}
 }
 
-// Тест --pretty флага
+// TestCatPrettyFlag verifies the --pretty flag produces indented output.
 func TestCatPrettyFlag(t *testing.T) {
 	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "--pretty")
 
@@ -388,24 +377,19 @@ func TestCatPrettyFlag(t *testing.T) {
 		t.Fatal("cat --pretty failed")
 	}
 
-	// Проверяем что есть отступы (признак pretty-print)
 	if !strings.Contains(stdout, "  \"age\"") {
 		t.Error("Output should contain indented fields")
 	}
 
-	// Проверяем что между записями есть пустые строки
 	if !strings.Contains(stdout, "}\n\n{") {
 		t.Error("Records should be separated by blank lines in pretty mode")
 	}
 
-	// Проверяем что весь вывод - валидный JSON если объединить записи в массив
-	// Разделяем по пустым строкам
 	records := strings.Split(strings.TrimSpace(stdout), "\n\n")
 	if len(records) != 3 {
 		t.Errorf("Expected 3 records separated by blank lines, got %d", len(records))
 	}
 
-	// Каждая запись должна быть валидным JSON
 	for i, record := range records {
 		var obj map[string]interface{}
 		if err := json.Unmarshal([]byte(record), &obj); err != nil {
@@ -414,7 +398,7 @@ func TestCatPrettyFlag(t *testing.T) {
 	}
 }
 
-// Тест короткого флага -p
+// TestCatPrettyShortFlag verifies the -p short flag produces indented output.
 func TestCatPrettyShortFlag(t *testing.T) {
 	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "-p")
 
@@ -422,13 +406,12 @@ func TestCatPrettyShortFlag(t *testing.T) {
 		t.Fatal("cat -p failed")
 	}
 
-	// Проверяем что есть отступы
 	if !strings.Contains(stdout, "  \"age\"") {
 		t.Error("Output should contain indented fields with -p flag")
 	}
 }
 
-// Тест что без флага выводится компактный JSON
+// TestCatCompactByDefault verifies compact JSON output is the default.
 func TestCatCompactByDefault(t *testing.T) {
 	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro")
 
@@ -436,18 +419,12 @@ func TestCatCompactByDefault(t *testing.T) {
 		t.Fatal("cat failed")
 	}
 
-	// Проверяем что НЕТ отступов (компактный JSON)
 	lines := strings.Split(strings.TrimSpace(stdout), "\n")
 
-	// Каждая строка должна начинаться с {, а не с пробелов
 	for i, line := range lines {
 		if !strings.HasPrefix(line, "{") {
 			t.Errorf("Line %d should start with '{' in compact mode, got: %s", i, line[:min(20, len(line))])
 		}
 
-		// Не должно быть двойных переносов строк между записями
-		if strings.Contains(line, "\n\n") {
-			t.Error("Should not have blank lines between records in compact mode")
-		}
 	}
 }
