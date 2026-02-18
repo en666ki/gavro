@@ -289,6 +289,27 @@ func TestSelectCountWithLimit(t *testing.T) {
 	}
 }
 
+// TestSelectStdin verifies reading from stdin via "-".
+func TestSelectStdin(t *testing.T) {
+	stdout, stderr, exitCode := runGavroWithStdin("../../tests/testdata/users.avro", "select", "-", "record.name")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("Expected 3 lines, got %d", len(lines))
+	}
+
+	expected := []string{`"Alice"`, `"Bob"`, `"Charlie"`}
+	for i, line := range lines {
+		if strings.TrimSpace(line) != expected[i] {
+			t.Errorf("Line %d: expected %s, got %s", i, expected[i], line)
+		}
+	}
+}
+
 func TestSelectHelp(t *testing.T) {
 	stdout, _, exitCode := runGavro("select", "--help")
 

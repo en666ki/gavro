@@ -17,15 +17,27 @@ type AvroReader struct {
 }
 
 // NewAvroReader opens an Avro OCF file and returns a reader for it.
+// If filePath is "-", it reads from stdin.
 func NewAvroReader(filePath string) (*AvroReader, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("cannot open file: %w", err)
+	var r io.Reader
+	var file *os.File
+
+	if filePath == "-" {
+		r = os.Stdin
+	} else {
+		f, err := os.Open(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("cannot open file: %w", err)
+		}
+		r = f
+		file = f
 	}
 
-	reader, err := ocf.NewDecoder(file)
+	reader, err := ocf.NewDecoder(r)
 	if err != nil {
-		file.Close()
+		if file != nil {
+			file.Close()
+		}
 		return nil, fmt.Errorf("cannot create avro decoder: %w", err)
 	}
 

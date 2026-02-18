@@ -58,6 +58,31 @@ func runGavro(args ...string) (stdout, stderr string, exitCode int) {
 	return outBuf.String(), errBuf.String(), exitCode
 }
 
+func runGavroWithStdin(stdinFile string, args ...string) (stdout, stderr string, exitCode int) {
+	cmd := exec.Command("/tmp/"+binaryName, args...)
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+
+	f, err := os.Open(stdinFile)
+	if err != nil {
+		return "", "failed to open stdin file: " + err.Error(), 1
+	}
+	defer f.Close()
+	cmd.Stdin = f
+
+	err = cmd.Run()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = 1
+		}
+	}
+
+	return outBuf.String(), errBuf.String(), exitCode
+}
+
 func TestCatSimpleUsers(t *testing.T) {
 	stdout, stderr, exitCode := runGavro("cat", "../../tests/testdata/users.avro")
 
@@ -547,5 +572,84 @@ func TestCatCompactByDefault(t *testing.T) {
 			t.Errorf("Line %d should start with '{' in compact mode, got: %s", i, line[:min(20, len(line))])
 		}
 
+	}
+}
+
+// TestCatStdin verifies reading from stdin via "-".
+func TestCatStdin(t *testing.T) {
+	stdout, stderr, exitCode := runGavroWithStdin("../../tests/testdata/users.avro", "cat", "-")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("Expected 3 lines, got %d", len(lines))
+	}
+
+	for i, line := range lines {
+		var record map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Errorf("Line %d is not valid JSON: %v", i, err)
+		}
+	}
+}
+
+// TestCatStdinEmpty verifies reading empty avro from stdin.
+func TestCatStdinEmpty(t *testing.T) {
+	stdout, _, exitCode := runGavroWithStdin("../../tests/testdata/empty.avro", "cat", "-")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d", exitCode)
+	}
+
+	if strings.TrimSpace(stdout) != "" {
+		t.Errorf("Expected no output for empty file, got: %s", stdout)
+	}
+}
+
+// TestCatStdinPretty verifies --pretty flag with stdin.
+func TestCatStdinPretty(t *testing.T) {
+	stdout, _, exitCode := runGavroWithStdin("../../tests/testdata/users.avro", "cat", "-", "--pretty")
+
+	if exitCode != 0 {
+		t.Fatal("cat - --pretty failed")
+	}
+
+	if !strings.Contains(stdout, "  \"age\"") {
+		t.Error("Output should contain indented fields")
+	}
+
+	records := strings.Split(strings.TrimSpace(stdout), "\n\n")
+	if len(records) != 3 {
+		t.Errorf("Expected 3 pretty-printed records, got %d", len(records))
+	}
+}
+
+// TestCatStdinLimit verifies --limit flag with stdin.
+func TestCatStdinLimit(t *testing.T) {
+	stdout, stderr, exitCode := runGavroWithStdin("../../tests/testdata/users.avro", "cat", "-", "--limit", "2")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) != 2 {
+		t.Errorf("Expected 2 lines, got %d", len(lines))
+	}
+}
+
+// TestCatStdinCount verifies --count flag with stdin.
+func TestCatStdinCount(t *testing.T) {
+	stdout, stderr, exitCode := runGavroWithStdin("../../tests/testdata/users.avro", "cat", "-", "--count")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	if strings.TrimSpace(stdout) != "3" {
+		t.Errorf("Expected 3, got %s", strings.TrimSpace(stdout))
 	}
 }
