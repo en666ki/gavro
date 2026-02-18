@@ -121,7 +121,7 @@ func TestProcess(t *testing.T) {
 	w := &mockWriter{}
 
 	proc := NewProcessor(r, w)
-	if err := proc.Process(); err != nil {
+	if _, err := proc.Process(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -138,7 +138,7 @@ func TestProcessEmptyReader(t *testing.T) {
 	w := &mockWriter{}
 
 	proc := NewProcessor(r, w)
-	if err := proc.Process(); err != nil {
+	if _, err := proc.Process(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -155,7 +155,7 @@ func TestProcessWrappedEOF(t *testing.T) {
 	w := &mockWriter{}
 
 	proc := NewProcessor(r, w)
-	if err := proc.Process(); err != nil {
+	if _, err := proc.Process(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -173,7 +173,7 @@ func TestProcessReadError(t *testing.T) {
 	w := &mockWriter{}
 
 	proc := NewProcessor(r, w)
-	err := proc.Process()
+	_, err := proc.Process()
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -193,7 +193,7 @@ func TestProcessWriteError(t *testing.T) {
 	w := &errorWriter{errorAt: 1}
 
 	proc := NewProcessor(r, w)
-	err := proc.Process()
+	_, err := proc.Process()
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -215,7 +215,7 @@ func TestProcessWithFilter(t *testing.T) {
 	}}
 
 	proc := NewProcessor(r, w, WithFilter(f))
-	if err := proc.Process(); err != nil {
+	if _, err := proc.Process(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -233,7 +233,7 @@ func TestProcessWithFilterNoMatches(t *testing.T) {
 	}}
 
 	proc := NewProcessor(r, w, WithFilter(f))
-	if err := proc.Process(); err != nil {
+	if _, err := proc.Process(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -250,7 +250,7 @@ func TestProcessWithFilterError(t *testing.T) {
 	w := &mockWriter{}
 
 	proc := NewProcessor(r, w, WithFilter(&errorFilter{}))
-	err := proc.Process()
+	_, err := proc.Process()
 	if err == nil {
 		t.Fatal("expected filter error")
 	}
@@ -268,7 +268,7 @@ func TestProcessWithTransform(t *testing.T) {
 	}
 
 	proc := NewProcessor(r, w, WithTransform(transform))
-	if err := proc.Process(); err != nil {
+	if _, err := proc.Process(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -292,7 +292,7 @@ func TestProcessWithTransformError(t *testing.T) {
 	}
 
 	proc := NewProcessor(r, w, WithTransform(transform))
-	err := proc.Process()
+	_, err := proc.Process()
 	if err == nil {
 		t.Fatal("expected transform error")
 	}
@@ -315,7 +315,7 @@ func TestProcessWithFilterAndTransform(t *testing.T) {
 	}
 
 	proc := NewProcessor(r, w, WithFilter(f), WithTransform(transform))
-	if err := proc.Process(); err != nil {
+	if _, err := proc.Process(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -337,7 +337,7 @@ func TestProcessWithLimit(t *testing.T) {
 	w := &mockWriter{}
 
 	proc := NewProcessor(r, w)
-	if err := proc.ProcessWithLimit(2); err != nil {
+	if _, err := proc.ProcessWithLimit(2); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -351,7 +351,7 @@ func TestProcessWithLimitZero(t *testing.T) {
 	w := &mockWriter{}
 
 	proc := NewProcessor(r, w)
-	if err := proc.ProcessWithLimit(0); err != nil {
+	if _, err := proc.ProcessWithLimit(0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -366,7 +366,7 @@ func TestProcessWithLimitExceedsRecords(t *testing.T) {
 	w := &mockWriter{}
 
 	proc := NewProcessor(r, w)
-	if err := proc.ProcessWithLimit(100); err != nil {
+	if _, err := proc.ProcessWithLimit(100); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -384,7 +384,7 @@ func TestProcessWithLimitAndFilter(t *testing.T) {
 	}}
 
 	proc := NewProcessor(r, w, WithFilter(f))
-	if err := proc.ProcessWithLimit(1); err != nil {
+	if _, err := proc.ProcessWithLimit(1); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -407,7 +407,7 @@ func TestProcessWithLimitFilterAndTransform(t *testing.T) {
 	}
 
 	proc := NewProcessor(r, w, WithFilter(f), WithTransform(transform))
-	if err := proc.ProcessWithLimit(2); err != nil {
+	if _, err := proc.ProcessWithLimit(2); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -427,7 +427,7 @@ func TestProcessWithLimitWrappedEOF(t *testing.T) {
 	w := &mockWriter{}
 
 	proc := NewProcessor(r, w)
-	if err := proc.ProcessWithLimit(100); err != nil {
+	if _, err := proc.ProcessWithLimit(100); err != nil {
 		t.Fatalf("unexpected error with wrapped EOF: %v", err)
 	}
 

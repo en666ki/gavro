@@ -377,6 +377,82 @@ func BenchmarkQuerySelectivity(b *testing.B) {
 	})
 }
 
+// TestQueryLimitFlag verifies the --limit flag limits output records.
+func TestQueryLimitFlag(t *testing.T) {
+	stdout, stderr, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 0", "--limit", "1")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) != 1 {
+		t.Errorf("Expected 1 line with --limit 1, got %d", len(lines))
+	}
+}
+
+// TestQueryLimitWithFilter verifies --limit applies after filtering.
+func TestQueryLimitWithFilter(t *testing.T) {
+	// age > 28 matches Alice(30) and Charlie(35) — limit 1 should return only Alice
+	stdout, stderr, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 28", "--limit", "1")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("Expected 1 line, got %d", len(lines))
+	}
+
+	var record map[string]interface{}
+	if err := json.Unmarshal([]byte(lines[0]), &record); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+	if record["name"] != "Alice" {
+		t.Errorf("Expected Alice, got %v", record["name"])
+	}
+}
+
+// TestQueryCountFlag verifies the --count flag outputs only the match count.
+func TestQueryCountFlag(t *testing.T) {
+	stdout, stderr, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 28", "--count")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	if strings.TrimSpace(stdout) != "2" {
+		t.Errorf("Expected 2, got %s", strings.TrimSpace(stdout))
+	}
+}
+
+// TestQueryCountNoMatches verifies --count returns 0 when no records match.
+func TestQueryCountNoMatches(t *testing.T) {
+	stdout, stderr, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 100", "--count")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	if strings.TrimSpace(stdout) != "0" {
+		t.Errorf("Expected 0, got %s", strings.TrimSpace(stdout))
+	}
+}
+
+// TestQueryCountWithLimit verifies --count and --limit work together.
+func TestQueryCountWithLimit(t *testing.T) {
+	stdout, stderr, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 28", "--count", "--limit", "1")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	if strings.TrimSpace(stdout) != "1" {
+		t.Errorf("Expected 1, got %s", strings.TrimSpace(stdout))
+	}
+}
+
 // TestQueryPrettyFlag verifies the --pretty flag produces indented output.
 func TestQueryPrettyFlag(t *testing.T) {
 	stdout, _, exitCode := runGavro("query", "../../tests/testdata/users.avro", "record.age > 28", "--pretty")

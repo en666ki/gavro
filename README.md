@@ -60,11 +60,19 @@ gavro query users.avro "has(record.score) && record.score > 0.5"
 gavro cat users.avro | jq 'select(.age > 18)'
 gavro query users.avro "record.active == true" | jq '.name'
 
-# Extract specific fields
-gavro cat users.avro | jq '{name, email}'
+# Limit output
+gavro cat users.avro --limit 10
+gavro query users.avro "record.age > 18" -n 5
 
 # Count records
-gavro cat users.avro | jq -s 'length'
+gavro cat users.avro --count
+gavro query users.avro "record.age > 18" --count
+
+# Count with limit
+gavro cat users.avro --count --limit 100
+
+# Extract specific fields
+gavro cat users.avro | jq '{name, email}'
 
 # Analyze schema with jq
 gavro schema users.avro | jq '.fields[].name'
@@ -74,9 +82,17 @@ gavro schema users.avro | jq '.fields[].name'
 
 - `gavro cat <file.avro>` - Output Avro file contents as JSON Lines
   - `--pretty, -p` - Pretty-print JSON with indentation
+  - `--limit, -n` - Maximum number of records to output
+  - `--count, -c` - Only print the number of records
 - `gavro query <file.avro> <expression>` - Filter records using CEL expressions
   - Alias: `q`
   - `--pretty, -p` - Pretty-print JSON with indentation
+  - `--limit, -n` - Maximum number of records to output
+  - `--count, -c` - Only print the number of matching records
+- `gavro select <file.avro> <field>...` - Extract specific fields from records
+  - `--pretty, -p` - Pretty-print JSON with indentation
+  - `--limit, -n` - Maximum number of records to output
+  - `--count, -c` - Only print the number of records
 - `gavro schema <file.avro>` - Display Avro schema as JSON
   - `--pretty, -p` - Pretty-print JSON with indentation
 - `gavro --help` - Show help
@@ -206,8 +222,8 @@ Future features planned:
 - [ ] `gavro convert` - Convert between formats (Avro ↔ JSON ↔ CSV)
 - [ ] `gavro stats` - Show statistics about Avro file
 - [ ] Support for reading from stdin
-- [ ] `--limit` flag for query results
-- [ ] `--count` flag to only count matches
+- [x] `--limit` flag for output records ✅
+- [x] `--count` flag to only count matches ✅
 
 ## Testing
 
