@@ -38,11 +38,21 @@ Examples:
 func init() {
 	rootCmd.AddCommand(catCmd)
 	catCmd.Flags().BoolP("pretty", "p", false, "pretty-print JSON with indentation")
+	catCmd.Flags().IntP("limit", "n", 0, "maximum number of records to output")
+	catCmd.Flags().BoolP("count", "c", false, "only print the number of records")
 }
 
 func runCat(cmd *cobra.Command, args []string) error {
 	filePath := args[0]
 	pretty, err := cmd.Flags().GetBool("pretty")
+	if err != nil {
+		return fmt.Errorf("internal error: %w", err)
+	}
+	limit, err := cmd.Flags().GetInt("limit")
+	if err != nil {
+		return fmt.Errorf("internal error: %w", err)
+	}
+	count, err := cmd.Flags().GetBool("count")
 	if err != nil {
 		return fmt.Errorf("internal error: %w", err)
 	}
@@ -53,11 +63,21 @@ func runCat(cmd *cobra.Command, args []string) error {
 	}
 	defer avroReader.Close()
 
-	jsonWriter := writer.NewJSONLinesWriter(os.Stdout, pretty)
+	var w writer.Writer
+	if count {
+		w = &writer.CountingWriter{}
+	} else {
+		w = writer.NewJSONLinesWriter(os.Stdout, pretty)
+	}
 
-	proc := processor.NewProcessor(avroReader, jsonWriter)
-	if err := proc.Process(); err != nil {
+	proc := processor.NewProcessor(avroReader, w)
+	n, err := proc.ProcessWithLimit(limit)
+	if err != nil {
 		return fmt.Errorf("processing failed: %w", err)
+	}
+
+	if count {
+		fmt.Fprintln(os.Stdout, n)
 	}
 
 	return nil

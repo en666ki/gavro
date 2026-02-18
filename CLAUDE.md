@@ -56,6 +56,17 @@ go run tests/testdata/generate.go
 gavro cat users.avro
 gavro cat users.avro --pretty
 
+# Limit output to first N records
+gavro cat users.avro --limit 10
+gavro cat users.avro -n 5
+
+# Count records
+gavro cat users.avro --count
+gavro cat users.avro -c
+
+# Count with limit
+gavro cat users.avro --count --limit 100
+
 # Display Avro schema
 gavro schema users.avro
 gavro schema users.avro --pretty
@@ -69,24 +80,24 @@ gavro select users.avro record.nested.field1 --pretty
 gavro query users.avro "record.age > 18"
 gavro q users.avro "record.name.startsWith('A')"
 
+# Count matching records
+gavro query users.avro "record.age > 18" --count
+
 # Filter records with jq
 gavro cat users.avro | jq 'select(.age > 18)'
 
 # Analyze schema
 gavro schema users.avro | jq '.fields[].name'
-
-# Count records
-gavro cat users.avro | jq -s 'length'
 ```
 
 ## CLI Commands
 
 | Command | Alias | Flags | Description |
 |---------|-------|-------|-------------|
-| `gavro cat <file.avro>` | — | `--pretty/-p` | Output all Avro records as JSON Lines |
+| `gavro cat <file.avro>` | — | `--pretty/-p`, `--limit/-n`, `--count/-c` | Output all Avro records as JSON Lines |
 | `gavro schema <file.avro>` | — | `--pretty/-p` | Display the Avro schema as JSON |
-| `gavro query <file.avro> <expr>` | `q` | `--pretty/-p` | Filter records using CEL expressions |
-| `gavro select <file.avro> <field>...` | — | `--pretty/-p` | Extract specific fields using dot notation (e.g. `record.name`) |
+| `gavro query <file.avro> <expr>` | `q` | `--pretty/-p`, `--limit/-n`, `--count/-c` | Filter records using CEL expressions |
+| `gavro select <file.avro> <field>...` | — | `--pretty/-p`, `--limit/-n`, `--count/-c` | Extract specific fields using dot notation (e.g. `record.name`) |
 | `gavro --version` | `-v` | — | Show version (semver, git hash, or "dev") |
 
 All data-output commands support `--pretty`/`-p` for indented JSON with blank-line separators between records.
@@ -111,7 +122,8 @@ gavro/
 │   │   └── avro.go      # Avro OCF reader implementation
 │   ├── writer/          # Data output layer
 │   │   ├── writer.go    # Writer interface
-│   │   └── jsonlines.go # JSON Lines writer (compact & pretty modes)
+│   │   ├── jsonlines.go # JSON Lines writer (compact & pretty modes)
+│   │   └── counting.go  # No-op writer for --count mode
 │   ├── filter/          # Filtering layer
 │   │   └── cel.go       # CEL expression filtering
 │   └── processor/       # Processing orchestration

@@ -369,6 +369,127 @@ func TestCatWithDifferentPaths(t *testing.T) {
 	}
 }
 
+// TestCatLimitFlag verifies the --limit flag limits output records.
+func TestCatLimitFlag(t *testing.T) {
+	testCases := []struct {
+		name          string
+		limit         string
+		expectedLines int
+	}{
+		{"limit 2", "2", 2},
+		{"limit 0 (no limit)", "0", 3},
+		{"limit exceeds total", "100", 3},
+		{"limit 1", "1", 1},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout, stderr, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "--limit", tc.limit)
+
+			if exitCode != 0 {
+				t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+			}
+
+			output := strings.TrimSpace(stdout)
+			if tc.expectedLines == 0 {
+				if output != "" {
+					t.Errorf("Expected empty output, got: %s", output)
+				}
+				return
+			}
+
+			lines := strings.Split(output, "\n")
+			if len(lines) != tc.expectedLines {
+				t.Errorf("Expected %d lines, got %d", tc.expectedLines, len(lines))
+			}
+		})
+	}
+}
+
+// TestCatLimitShortFlag verifies the -n short flag works.
+func TestCatLimitShortFlag(t *testing.T) {
+	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "-n", "1")
+
+	if exitCode != 0 {
+		t.Fatal("cat -n 1 failed")
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) != 1 {
+		t.Errorf("Expected 1 line, got %d", len(lines))
+	}
+}
+
+// TestCatCountFlag verifies the --count flag outputs only the record count.
+func TestCatCountFlag(t *testing.T) {
+	testCases := []struct {
+		name     string
+		file     string
+		expected string
+	}{
+		{"users file", "../../tests/testdata/users.avro", "3"},
+		{"empty file", "../../tests/testdata/empty.avro", "0"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout, stderr, exitCode := runGavro("cat", tc.file, "--count")
+
+			if exitCode != 0 {
+				t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+			}
+
+			if strings.TrimSpace(stdout) != tc.expected {
+				t.Errorf("Expected %s, got %s", tc.expected, strings.TrimSpace(stdout))
+			}
+		})
+	}
+}
+
+// TestCatCountShortFlag verifies the -c short flag works.
+func TestCatCountShortFlag(t *testing.T) {
+	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "-c")
+
+	if exitCode != 0 {
+		t.Fatal("cat -c failed")
+	}
+
+	if strings.TrimSpace(stdout) != "3" {
+		t.Errorf("Expected 3, got %s", strings.TrimSpace(stdout))
+	}
+}
+
+// TestCatCountWithLimit verifies --count and --limit work together.
+func TestCatCountWithLimit(t *testing.T) {
+	stdout, stderr, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "--count", "--limit", "2")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	if strings.TrimSpace(stdout) != "2" {
+		t.Errorf("Expected 2, got %s", strings.TrimSpace(stdout))
+	}
+}
+
+// TestCatLimitWithPretty verifies --limit works with --pretty.
+func TestCatLimitWithPretty(t *testing.T) {
+	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "--limit", "2", "--pretty")
+
+	if exitCode != 0 {
+		t.Fatal("cat --limit --pretty failed")
+	}
+
+	if !strings.Contains(stdout, "  \"age\"") {
+		t.Error("Output should contain indented fields")
+	}
+
+	records := strings.Split(strings.TrimSpace(stdout), "\n\n")
+	if len(records) != 2 {
+		t.Errorf("Expected 2 pretty-printed records, got %d", len(records))
+	}
+}
+
 // TestCatPrettyFlag verifies the --pretty flag produces indented output.
 func TestCatPrettyFlag(t *testing.T) {
 	stdout, _, exitCode := runGavro("cat", "../../tests/testdata/users.avro", "--pretty")

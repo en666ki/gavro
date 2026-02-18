@@ -48,12 +48,13 @@ func NewProcessor(r reader.Reader, w writer.Writer, opts ...Option) *Processor {
 }
 
 // Process reads all records and writes them to the writer.
-func (p *Processor) Process() error {
+func (p *Processor) Process() (int, error) {
 	return p.ProcessWithLimit(0)
 }
 
 // ProcessWithLimit reads up to limit records. A limit of 0 means no limit.
-func (p *Processor) ProcessWithLimit(limit int) error {
+// Returns the number of records written.
+func (p *Processor) ProcessWithLimit(limit int) (int, error) {
 	count := 0
 	for {
 		if limit > 0 && count >= limit {
@@ -65,13 +66,13 @@ func (p *Processor) ProcessWithLimit(limit int) error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("read error: %w", err)
+			return count, fmt.Errorf("read error: %w", err)
 		}
 
 		if p.filter != nil {
 			matches, err := p.filter.Matches(record)
 			if err != nil {
-				return fmt.Errorf("filter error: %w", err)
+				return count, fmt.Errorf("filter error: %w", err)
 			}
 			if !matches {
 				continue
@@ -82,20 +83,20 @@ func (p *Processor) ProcessWithLimit(limit int) error {
 		if p.transform != nil {
 			output, err = p.transform(record)
 			if err != nil {
-				return fmt.Errorf("transform error: %w", err)
+				return count, fmt.Errorf("transform error: %w", err)
 			}
 		}
 
 		if err := p.writer.Write(output); err != nil {
-			return fmt.Errorf("write error: %w", err)
+			return count, fmt.Errorf("write error: %w", err)
 		}
 
 		count++
 	}
 
 	if err := p.writer.Flush(); err != nil {
-		return fmt.Errorf("flush error: %w", err)
+		return count, fmt.Errorf("flush error: %w", err)
 	}
 
-	return nil
+	return count, nil
 }

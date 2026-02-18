@@ -245,6 +245,50 @@ func TestSelectOnlyFile(t *testing.T) {
 	}
 }
 
+func TestSelectLimitFlag(t *testing.T) {
+	stdout, stderr, exitCode := runGavro("select", "../../tests/testdata/users.avro", "record.name", "--limit", "2")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) != 2 {
+		t.Errorf("Expected 2 lines with --limit 2, got %d", len(lines))
+	}
+
+	if strings.TrimSpace(lines[0]) != `"Alice"` {
+		t.Errorf("Expected Alice, got %s", lines[0])
+	}
+	if strings.TrimSpace(lines[1]) != `"Bob"` {
+		t.Errorf("Expected Bob, got %s", lines[1])
+	}
+}
+
+func TestSelectCountFlag(t *testing.T) {
+	stdout, stderr, exitCode := runGavro("select", "../../tests/testdata/users.avro", "record.name", "--count")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	if strings.TrimSpace(stdout) != "3" {
+		t.Errorf("Expected 3, got %s", strings.TrimSpace(stdout))
+	}
+}
+
+func TestSelectCountWithLimit(t *testing.T) {
+	stdout, stderr, exitCode := runGavro("select", "../../tests/testdata/users.avro", "record.name", "--count", "--limit", "1")
+
+	if exitCode != 0 {
+		t.Fatalf("Expected exit code 0, got %d. Stderr: %s", exitCode, stderr)
+	}
+
+	if strings.TrimSpace(stdout) != "1" {
+		t.Errorf("Expected 1, got %s", strings.TrimSpace(stdout))
+	}
+}
+
 func TestSelectHelp(t *testing.T) {
 	stdout, _, exitCode := runGavro("select", "--help")
 
